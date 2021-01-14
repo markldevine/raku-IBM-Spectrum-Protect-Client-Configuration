@@ -1,0 +1,15 @@
+---
+name: raku-IBM-Spectrum-Protect-Client-Configuration
+entrypoint: service.raku
+endpoints: 
+  - 
+    name: HTTP
+    port-env: RAKU_IBM_SPECTRUM_PROTECT_CLIENT_CONFIGURATION_PORT
+    host-env: RAKU_IBM_SPECTRUM_PROTECT_CLIENT_CONFIGURATION_HOST
+    protocol: http
+    id: http
+id: raku-IBM-Spectrum-Protect-Client-Configuration
+cro: 1
+env:  []
+links:  []
+...

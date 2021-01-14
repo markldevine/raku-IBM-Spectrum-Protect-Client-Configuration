@@ -1,0 +1,21 @@
+{
+    "auth":         "github:markldevine",
+    "authors":      [ "Mark Devine <mark@markdevine.com>" ],
+    "depends":      [
+        "cro"
+    ],
+    "description":  "IBM Spectrum Protect - Client Configuration",
+    "license":      "Artistic-2.0",
+    "meta-version": 0,
+    "name":         "IBM::Spectrum::Protect::Client::Configuration",
+    "perl":         "6.*",
+    "provides":     {
+        "IBM::Spectrum::Protect::Client::Configuration": "lib//IBM/Spectrum/Protect/Client/Configuration.rakumod"
+    },
+    "resources":    [],
+    "source-url":   "https://github.com/markldevine/raku-IBM-Spectrum-Protect-Client-Configuration.git",
+    "tags":         [
+        "ISP"
+    ],
+    "version":      "0.0.1"
+}
