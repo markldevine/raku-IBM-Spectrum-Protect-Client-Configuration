@@ -1,0 +1,71 @@
+#!/usr/bin/env raku
+
+my          $platform               = 'win32';
+
+my          $isp-server-ip-label    = 'catsmdev01';
+my          $isp-server-ip-address  = '10.11.101.39';
+my          $client-ip-label        = 'CTBUSRT1DB1MGT';
+my          $client-ip-address      = '10.11.138.147';
+#y          $client-ip-label        = 'CTBUSRT1DB2MGT';
+#y          $client-ip-address      = '10.11.139.145';
+
+my          $DOMAIN                 = 'C:';
+my          $ERRORLOGRETENTION      = '14 D';
+my          $SCHEDLOGRETENTION      = '14 D';
+
+my          $NODENAME               = 'CTBUSRT1DB1MGT'.uc;
+my          $password               = $NODENAME.lc;
+my          $HTTPPORT               = 1581;
+my          $WEBPORT                = 1582;
+
+my          $dsm-opt-file           = 'dsm_' ~ $NODENAME ~ '.opt';
+
+multi backup-archive-configuration-base-dir (:$platform where $platform eq 'linux') { return '/opt/tivoli/tsm/client/ba/bin'; } 
+multi backup-archive-configuration-base-dir (:$platform where $platform eq 'win32') { return 'C:\Program Files\Tivoli\TSM\baclient'; }
+
+multi pasteable-backup-archive-configuration-file(:$platform where $platform eq 'win32') {
+    return q:to/ENDOFPASTEABLEBACKUPARCHIVECONFIGURATIONFILE/; 
+    C:
+    CD \qq[{backup-archive-configuration-base-dir(:$platform)}]
+    ECHO  CLUSTERDISKSONLY           NO > \qq[$dsm-opt-file]
+    ECHO  CLUSTERNODE                NO >> \qq[$dsm-opt-file]
+    ECHO  COMMMETHOD                 TCPIP >> \qq[$dsm-opt-file]
+    ECHO  COMPRESSALWAYS             YES >> \qq[$dsm-opt-file]
+    ECHO  COMPRESSION                NO >> \qq[$dsm-opt-file]
+    ECHO  DISKBUFFSIZE               32 >> \qq[$dsm-opt-file]
+    ECHO  DOMAIN                     "\qq[$DOMAIN]" >> \qq[$dsm-opt-file]
+    ECHO  ENABLEINSTRUMENTATION      NO >> \qq[$dsm-opt-file]
+    ECHO  ERRORLOGNAME               "\qq[{backup-archive-configuration-base-dir(:$platform)}]\dsmerror.log" >> \qq[$dsm-opt-file]
+    ECHO  ERRORLOGRETENTION          \qq[$ERRORLOGRETENTION] >> \qq[$dsm-opt-file]
+    ECHO  HTTPPORT                   \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
+    ECHO *INCLEXCL                   "\qq[{backup-archive-configuration-base-dir(:$platform)}]\INCLEXCL.ISP" >> \qq[$dsm-opt-file]
+    ECHO *INSTRLOGMAX                25 >> \qq[$dsm-opt-file]
+    ECHO  INSTRLOGNAME               "\qq[{backup-archive-configuration-base-dir(:$platform)}]\dsminstr.log" >> \qq[$dsm-opt-file]
+    ECHO  LANFREECOMMMETHOD          NAMEDPIPES >> \qq[$dsm-opt-file]
+    ECHO  LANGUAGE                   ENU >> \qq[$dsm-opt-file]
+    ECHO  MANAGEDSERVICES            SCHEDULE WEBCLIENT >> \qq[$dsm-opt-file]
+    ECHO  NODENAME                   \qq[$NODENAME] >> \qq[$dsm-opt-file]
+    ECHO  PASSWORDACCESS             GENERATE >> \qq[$dsm-opt-file]
+    ECHO *PRESCHEDULECMD             "\qq[{backup-archive-configuration-base-dir(:$platform)}]\PREBACKUP.BAT" >> \qq[$dsm-opt-file]
+    ECHO *POSTSCHEDULECMD            "\qq[{backup-archive-configuration-base-dir(:$platform)}]\POSTBACKUP.BAT" >> \qq[$dsm-opt-file]
+    ECHO  RESOURCEUTILIZATION        10 >> \qq[$dsm-opt-file]
+    ECHO  SCHEDLOGNAME               "\qq[{backup-archive-configuration-base-dir(:$platform)}]\dsmsched.log" >> \qq[$dsm-opt-file]
+    ECHO  SCHEDLOGRETENTION          \qq[$SCHEDLOGRETENTION] >> \qq[$dsm-opt-file]
+    ECHO  SCHEDMODE                  PROMPTED >> \qq[$dsm-opt-file]
+    ECHO  SUBDIR                     YES >> \qq[$dsm-opt-file]
+    ECHO  TCPBUFFSIZE                128 >> \qq[$dsm-opt-file]
+    ECHO  TCPCLIENTADDRESS           \qq[$client-ip-address] >> \qq[$dsm-opt-file]
+    ECHO  TCPPORT                    1500 >> \qq[$dsm-opt-file]
+    ECHO  TCPSERVERADDRESS           \qq[$isp-server-ip-address] >> \qq[$dsm-opt-file]
+    ECHO  TCPWINDOWSIZE              63 >> \qq[$dsm-opt-file]
+    ECHO  TXNBYTELIMIT               25600K >> \qq[$dsm-opt-file]
+    ECHO  WEBPORTS                   \qq[$WEBPORT] \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
+    dsmc query session
+    dsmcutil install scheduler /name:"IBM Spectrum Protect Client Scheduler" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:no /startnow:no /optfile:"\qq[{backup-archive-configuration-base-dir(:$platform)}]\\\qq[$dsm-opt-file]"
+    dsmcutil install cad /name:"IBM Spectrum Protect Client Acceptor" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:yes /startnow:yes /cadschedname:"IBM Spectrum Protect Client Scheduler" /optfile:"\qq[{backup-archive-configuration-base-dir(:$platform)}]\\\qq[$dsm-opt-file]"
+    ENDOFPASTEABLEBACKUPARCHIVECONFIGURATIONFILE
+}
+
+put pasteable-backup-archive-configuration-file(:$platform);
+
+=finish
