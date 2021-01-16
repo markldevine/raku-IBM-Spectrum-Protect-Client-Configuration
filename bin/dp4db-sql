@@ -1,5 +1,0 @@
-#!/usr/bin/env raku
-
-say $*PROGRAM-NAME;
-
-

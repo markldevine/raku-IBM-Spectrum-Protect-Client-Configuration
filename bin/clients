@@ -1,0 +1,407 @@
+#!/usr/bin/env raku
+
+ my Str $isp-server-ip-label        = 'catsmdev01';
+ my Str $isp-server-ip-address      = '10.11.101.39';
+ my Str $host-name                  = 'CTBUSRTO1DB1Qv';
+ my Str $client-ip-label            = 'CTBUSRT1DB1MGT'; my Str $client-ip-address = '10.11.138.147';
+#my Str $client-ip-label            = 'CTBUSRT1DB2MGT'; my Str $client-ip-address = '10.11.139.145';
+ my Str  $sql-server-instance    = 'RTSQL';
+ my %instances                      = (
+                                        RTSQL       => { EXCLUDEDBS => [ 'CleverCAD_Cadstore' ],                        LOGRPO => },
+                                        RPSQL       => { EXCLUDEDBS => [ 'CleverReportsDW', 'Ridecheck_Washington' ],   LOGRPO => },
+                                        AVMSQL      => { EXCLUDEDBS => [],                                              LOGRPO => },
+                                        Smartyard   => { EXCLUDEDBS => [],                                              LOGRPO => },
+                                        RTLSSQL     => { EXCLUDEDBS => [],                                              LOGRPO => },
+                                      );
+
+ my Str $config-drive               = '%SYSTEMDRIVE%';
+ my Str $config-base-directory      = $config-drive ~ '\WMATA\ITIO\EnterpriseBackup\ISP\NODES';
+
+ my Int $HTTPPORT                   = 1581 - 2;
+ my Int $WEBPORT                    = 1582 - 2;
+
+sub pasteable-backup-archive-configuration-file {
+    $HTTPPORT                      += 2;
+    $WEBPORT                       += 2;
+    my Str  $NODENAME               = $host-name.uc;
+    my Str  $node-base-directory    = $config-base-directory ~ '\\' ~ $NODENAME;
+    my Str  $password               = $NODENAME.lc;
+    my Str  $contact                = 'Burns, Richard';
+    my Str  $email-address          = 'itappsbusteam@wmata.com';
+    my Int  $maxnummp               = 2;
+    my Str  $domain                 = 'WIND.DOM';
+    my Str  $cos                    = 'WIN.COS';
+    my Str  $schedule               = '1800';
+    put 'REGISTER NODE '
+        ~ $NODENAME ~ ' '           ~ $password         ~ ' '
+        ~ 'CLOPTSET='               ~ $cos              ~ ' '
+        ~ 'DOMAIN='                 ~ $domain           ~ ' '
+        ~ 'MAXNUMMP='               ~ $maxnummp         ~ ' '
+        ~ 'USER=NONE'                                   ~ ' '
+        ~ 'EMAILADDRESS='           ~ $email-address    ~ ' '
+        ~ 'CONTACT="'               ~ $contact          ~ '"';
+    put 'DEFINE ASSOCIATION '
+        ~ $domain                                       ~ ' '
+        ~ $schedule                                     ~ ' '
+        ~ $NODENAME;
+    my Str  $DOMAIN                 = '"C:"';
+    my Str  $ERRORLOGRETENTION      = '14 D';
+    my Str  $SCHEDLOGRETENTION      = '14 D';
+    my Str  $dsm-opt-file           = $node-base-directory ~ '\\' ~ 'dsm.opt';
+    my Str  $dsm-opt-shortcut-file  = $node-base-directory ~ '\\' ~ 'dsm.lnk';
+    put q:to/ENDOFPASTEABLEBACKUPARCHIVECONFIGURATIONFILE/; 
+
+    MKDIR \qq[$node-base-directory]
+    CD /D \qq[$node-base-directory]
+    ECHO  CLUSTERDISKSONLY           NO > \qq[$dsm-opt-file]
+    ECHO  CLUSTERNODE                NO >> \qq[$dsm-opt-file]
+    ECHO  COMMMETHOD                 TCPIP >> \qq[$dsm-opt-file]
+    ECHO  COMPRESSALWAYS             YES >> \qq[$dsm-opt-file]
+    ECHO  COMPRESSION                NO >> \qq[$dsm-opt-file]
+    ECHO  DISKBUFFSIZE               32 >> \qq[$dsm-opt-file]
+    ECHO  DOMAIN                     \qq[$DOMAIN] >> \qq[$dsm-opt-file]
+    ECHO  ENABLEINSTRUMENTATION      NO >> \qq[$dsm-opt-file]
+    ECHO  ERRORLOGNAME               "\qq[$node-base-directory]\dsmerror.log" >> \qq[$dsm-opt-file]
+    ECHO  ERRORLOGRETENTION          \qq[$ERRORLOGRETENTION] >> \qq[$dsm-opt-file]
+    ECHO  HTTPPORT                   \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
+    ECHO *INCLEXCL                   "\qq[$node-base-directory]\INCLEXCL.ISP" >> \qq[$dsm-opt-file]
+    ECHO *INSTRLOGMAX                25 >> \qq[$dsm-opt-file]
+    ECHO  INSTRLOGNAME               "\qq[$node-base-directory]\dsminstr.log" >> \qq[$dsm-opt-file]
+    ECHO  LANGUAGE                   ENU >> \qq[$dsm-opt-file]
+    ECHO  MANAGEDSERVICES            SCHEDULE >> \qq[$dsm-opt-file]
+    ECHO  NODENAME                   \qq[$NODENAME] >> \qq[$dsm-opt-file]
+    ECHO  PASSWORDACCESS             GENERATE >> \qq[$dsm-opt-file]
+    ECHO *PRESCHEDULECMD             "\qq[$node-base-directory]\PREBACKUP.BAT" >> \qq[$dsm-opt-file]
+    ECHO *POSTSCHEDULECMD            "\qq[$node-base-directory]\POSTBACKUP.BAT" >> \qq[$dsm-opt-file]
+    ECHO  RESOURCEUTILIZATION        10 >> \qq[$dsm-opt-file]
+    ECHO  SCHEDLOGNAME               "\qq[$node-base-directory]\dsmsched.log" >> \qq[$dsm-opt-file]
+    ECHO  SCHEDLOGRETENTION          \qq[$SCHEDLOGRETENTION] >> \qq[$dsm-opt-file]
+    ECHO  SCHEDMODE                  PROMPTED >> \qq[$dsm-opt-file]
+    ECHO  SUBDIR                     YES >> \qq[$dsm-opt-file]
+    ECHO  TCPBUFFSIZE                128 >> \qq[$dsm-opt-file]
+    ECHO  TCPCLIENTADDRESS           \qq[$client-ip-address] >> \qq[$dsm-opt-file]
+    ECHO  TCPPORT                    1500 >> \qq[$dsm-opt-file]
+    ECHO  TCPSERVERADDRESS           \qq[$isp-server-ip-address] >> \qq[$dsm-opt-file]
+    ECHO  TCPWINDOWSIZE              63 >> \qq[$dsm-opt-file]
+    ECHO  TXNBYTELIMIT               25600K >> \qq[$dsm-opt-file]
+    ECHO  WEBPORTS                   \qq[$WEBPORT] \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
+
+    SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient
+    ECHO %PATH% | FIND /I "%DSM_DIR%" > DSM_DIR_CHECK.TST
+    FOR %I IN (DSM_DIR_CHECK.TST) DO SET DSM_DIR_CHECK=%~zI
+    IF %DSM_DIR_CHECK% EQU 0 SET PATH=%DSM_DIR%;%PATH%
+    DEL DSM_DIR_CHECK.TST
+    dsmc query session -optfile=\qq[$dsm-opt-file]
+    dsmcutil install scheduler /name:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:no /startnow:no /optfile:"\qq[$dsm-opt-file]"
+    dsmcutil install cad /name:"IBM Spectrum Protect Acceptor: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:yes /startnow:yes /cadschedname:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /optfile:"\qq[$dsm-opt-file]"
+    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$dsm-opt-shortcut-file]');$s.TargetPath='%SYSTEMDRIVE%\Program Files\Tivoli\TSM\baclient\dsmc.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
+    ENDOFPASTEABLEBACKUPARCHIVECONFIGURATIONFILE
+}
+
+sub pasteable-dp4sql-configuration-files {
+    $HTTPPORT                      += 2;
+    $WEBPORT                       += 2;
+    my Str  $NODENAME               = $sql-server-instance ~ '_SQL';
+    my Str  @exclude-dbs            = <CleverCAD_Cadstore>;
+    my Str  $EXCLUDEDB              = '/EXCLUDEDB=master,model,msdb';
+    $EXCLUDEDB                     ~= ',' ~ @exclude-dbs.join(',') if @exclude-dbs;
+    my Str  $node-base-directory    = $config-base-directory ~ '\\' ~ $NODENAME;
+    my Str  $scripts-base-directory = $node-base-directory ~ '\\SCRIPTS';
+    my Str  $password               = $NODENAME.lc;
+    my Str  $contact                = 'Burns, Richard';
+    my Str  $email-address          = 'itappsbusteam@wmata.com';
+    my Int  $maxnummp               = 5;
+    my Str  $domain                 = 'MSSQL.DOM';
+    my Str  $cos                    = $NODENAME ~ '.COS';
+    my Str  $schedule               = '1900';
+    my Int  $default-stripes        = 3;
+    my Int  $log-prune              = 60;
+    put 'DEFINE CLOPTSET '          ~ $cos;
+#   put 'DEFINE CLIENTOPT '         ~ $cos              ~ ' '
+#       ~ '...........';
+    put 'REGISTER NODE '
+        ~ $NODENAME ~ ' '           ~ $password         ~ ' '
+        ~ 'CLOPTSET='               ~ $cos              ~ ' '
+        ~ 'DOMAIN='                 ~ $domain           ~ ' '
+        ~ 'MAXNUMMP='               ~ $maxnummp         ~ ' '
+        ~ 'USER=NONE'                                   ~ ' '
+        ~ 'BACKDEL=YES'                                 ~ ' '
+        ~ 'TXNGROUPMAX=12'                              ~ ' '
+        ~ 'EMAILADDRESS='           ~ $email-address    ~ ' '
+        ~ 'CONTACT="'               ~ $contact          ~ '"';
+    put 'DEFINE ASSOCIATION '
+        ~ $domain                                       ~ ' '
+        ~ $schedule                                     ~ ' '
+        ~ $NODENAME;
+    my Str  $DOMAIN                 = '"C:"';
+    my Str  $ERRORLOGRETENTION      = '14 D';
+    my Str  $SCHEDLOGRETENTION      = '14 D';
+    my Str  $dsm-opt-file           = $node-base-directory ~ '\\' ~ 'dsm.opt';
+    my Str  $dsm-opt-shortcut-file  = $node-base-directory ~ '\\' ~ 'dsm.lnk';
+    my Str  $tdpsql-cfg-file        = $node-base-directory ~ '\\' ~ 'tdpsql.cfg';
+
+    put q:to/ENDOFPASTEABLEDP4SQLCONFIGURATIONFILES/; 
+
+    MKDIR \qq[$node-base-directory]
+    CD /D \qq[$node-base-directory]
+    ECHO  COMMMETHOD                 TCPIP >> \qq[$dsm-opt-file]
+    ECHO  COMPRESSALWAYS             YES >> \qq[$dsm-opt-file]
+    ECHO  COMPRESSION                NO >> \qq[$dsm-opt-file]
+    ECHO  DISKBUFFSIZE               32 >> \qq[$dsm-opt-file]
+    ECHO  DOMAIN                     \qq[$DOMAIN] >> \qq[$dsm-opt-file]
+    ECHO  ENABLEINSTRUMENTATION      NO >> \qq[$dsm-opt-file]
+    ECHO  ERRORLOGNAME               "\qq[$node-base-directory]\dsmerror.log" >> \qq[$dsm-opt-file]
+    ECHO  ERRORLOGRETENTION          \qq[$ERRORLOGRETENTION] >> \qq[$dsm-opt-file]
+    ECHO  HTTPPORT                   \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
+    ECHO *INCLEXCL                   "\qq[$node-base-directory]\INCLEXCL.ISP" >> \qq[$dsm-opt-file]
+    ECHO *INSTRLOGMAX                25 >> \qq[$dsm-opt-file]
+    ECHO  INSTRLOGNAME               "\qq[$node-base-directory]\dsminstr.log" >> \qq[$dsm-opt-file]
+    ECHO  LANGUAGE                   ENU >> \qq[$dsm-opt-file]
+    ECHO  MANAGEDSERVICES            SCHEDULE WEBCLIENT >> \qq[$dsm-opt-file]
+    ECHO  NODENAME                   \qq[$NODENAME] >> \qq[$dsm-opt-file]
+    ECHO  PASSWORDACCESS             GENERATE >> \qq[$dsm-opt-file]
+    ECHO *PRESCHEDULECMD             "\qq[$node-base-directory]\PREBACKUP.BAT" >> \qq[$dsm-opt-file]
+    ECHO *POSTSCHEDULECMD            "\qq[$node-base-directory]\POSTBACKUP.BAT" >> \qq[$dsm-opt-file]
+    ECHO  SCHEDLOGNAME               "\qq[$node-base-directory]\dsmsched.log" >> \qq[$dsm-opt-file]
+    ECHO  SCHEDLOGRETENTION          \qq[$SCHEDLOGRETENTION] >> \qq[$dsm-opt-file]
+    ECHO  SCHEDMODE                  PROMPTED >> \qq[$dsm-opt-file]
+    ECHO  TCPBUFFSIZE                128 >> \qq[$dsm-opt-file]
+    ECHO  TCPCLIENTADDRESS           \qq[$client-ip-address] >> \qq[$dsm-opt-file]
+    ECHO  TCPPORT                    1500 >> \qq[$dsm-opt-file]
+    ECHO  TCPSERVERADDRESS           \qq[$isp-server-ip-address] >> \qq[$dsm-opt-file]
+    ECHO  TCPWINDOWSIZE              63 >> \qq[$dsm-opt-file]
+    ECHO  TXNBYTELIMIT               25600K >> \qq[$dsm-opt-file]
+    ECHO  WEBPORTS                   \qq[$WEBPORT] \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
+
+    SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient
+    ECHO %PATH% | FIND /I "%DSM_DIR%" > DSM_DIR_CHECK.TST
+    FOR %I IN (DSM_DIR_CHECK.TST) DO SET DSM_DIR_CHECK=%~zI
+    IF %DSM_DIR_CHECK% EQU 0 SET PATH=%DSM_DIR%;%PATH%
+    DEL DSM_DIR_CHECK.TST
+    dsmc query session -optfile=\qq[$dsm-opt-file]
+    dsmcutil install scheduler /name:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:no /startnow:no /optfile:"\qq[$dsm-opt-file]"
+    SC.EXE CONFIG "IBM Spectrum Protect Scheduler: \qq[$NODENAME]" obj= "WMATA\ITIOISPSQLSRV" password= ""
+    dsmcutil install cad /name:"IBM Spectrum Protect Acceptor: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:yes /startnow:yes /cadschedname:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /optfile:"\qq[$dsm-opt-file]"
+    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$dsm-opt-shortcut-file]');$s.TargetPath='%SYSTEMDRIVE%\Program Files\Tivoli\TSM\baclient\dsmc.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
+
+    ECHO BACKUPDESTINATION  TSM > \qq[$tdpsql-cfg-file]
+    ECHO BACKUPMETHOD       LEGACY >> \qq[$tdpsql-cfg-file]
+    ECHO LOGFILE            \qq[$node-base-directory]\tdpsql.log >> \qq[$tdpsql-cfg-file]
+    ECHO LOGPRUNE           \qq[$log-prune] >> \qq[$tdpsql-cfg-file]
+    ECHO SQLAUTHENTICATION  INTEGRATED >> \qq[$tdpsql-cfg-file]
+    ECHO SQLSERVER          lpc:\qq[$sql-server-instance] >> \qq[$tdpsql-cfg-file]
+    ECHO STRIPES            \qq[$default-stripes] >> \qq[$tdpsql-cfg-file]
+
+    MKDIR \qq[$scripts-base-directory]
+    CD /D \qq[$scripts-base-directory]
+
+    ECHO CHCP 1252 > \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO PUSHD . >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO SET RC=0 >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO TDPSQLC BACKUP master,model,msdb FULL /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO POPD >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+
+    ECHO CHCP 1252 > \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO PUSHD . >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO SET RC=0 >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO TDPSQLC BACKUP * FULL \qq[$EXCLUDEDB] /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO POPD >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+
+    ECHO CHCP 1252 > \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO PUSHD . >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO SET RC=0 >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO TDPSQLC BACKUP * DIFFFULL \qq[$EXCLUDEDB] /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO POPD >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+
+    ECHO CHCP 1252 > \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO PUSHD . >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO CD /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO SET RC=0 >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO TDPSQLC BACKUP * Log \qq[$EXCLUDEDB] /Truncate=YES /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO POPD >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ENDOFPASTEABLEDP4SQLCONFIGURATIONFILES
+    for @exclude-dbs -> $db {
+        put q:to/ENDOFPASTEABLEDP4SQLCONFIGURATIONFILESEXCLUDEDB/;
+        ECHO CHCP 1252 > \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO PUSHD . >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO SET RC=0 >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO TDPSQLC BACKUP \qq[$db] FULL /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO POPD >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+
+        ECHO CHCP 1252 > \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO PUSHD . >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO SET RC=0 >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO TDPSQLC BACKUP * DIFFFULL \qq[$EXCLUDEDB] /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO POPD >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+
+        ECHO CHCP 1252 > \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO PUSHD . >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO CD /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO SET RC=0 >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO TDPSQLC BACKUP * Log \qq[$EXCLUDEDB] /Truncate=YES /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO POPD >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ENDOFPASTEABLEDP4SQLCONFIGURATIONFILESEXCLUDEDB
+    }
+}
+
+pasteable-backup-archive-configuration-file();
+pasteable-dp4sql-configuration-files();
+
+=finish
+
+RTSQL (NeverFail)
+CleverCAD
+              Current Size:43GB
+Estimated Max Size:85GB
+CleverCAD_Cadstore
+Current Size:5.8 TB
+Estimated Max Size 8TB
+CleverCAD_ProcessController
+Current Size:20MB
+CleverCAD_Staging
+Current Size:2GB
+Schedule
+Current Size:23MB
+Estimated Max Size: 25GB
+Security
+Current Size:23MB
+Live Schedule
+Current Size:23MB
+Estimated Max Size: 25GB
+CW_Adjustments
+Current Size:23MB
+
+Current Backup Cycle:  
+               N/A, CleverWorks Databases not currently backed up
+               CleverCAD, Transactional Log Backups every hour, Full Backups Daily
+               CleverCAD_Cadstore, Full Backup Weekly, Differentials Daily
+               Other Cad Databases not backed up
+               
+Recommended Backup Cycle:
+               For CleverWorks Databases, Full Backup once a week, Differentials once daily every other day , not run between the hours of 12-4am
+               For CleverCAD and Cadstore databases, maintain a minimum of existing cycle
+               For remaining CAD Databases, follow Cleverworks Schedules
+
+RPSQL (NeverFail)
+CleverReportsDW
+Current Size:2.6 TB
+Estimated Max Size for 2 Years: 2.8TB
+CleverReportsWeb
+Current Size:9GB
+Estimated Max Size: 9GB
+CRPreprocessor
+Current Size:450GB
+Estimated Max Size: 475GB
+Ridecheck_Washington
+Current Size:1.3TB
+Estimated Max Size : N/A Ongoing, no retention limit
+BuslinkAS
+Current Size:7GB
+BuslinkDS
+Current Size:1GB
+FleetManager
+Current Size:1GB
+RSMIngester
+Current Size:70GB
+Estimated Max Size: 100GB
+
+Current Backup Cycle:  
+               N/A, Backup Volume too small on SQL Server to backup any databases (6GB Volume)
+Recommended Backup Cycle:
+               Full Backup once a week, Differentials once daily every other day , not run between the hours of 12-6am
+
+AVMSQL (NeverFail)
+AVM3
+Current Size:210GB
+Estimated Max Size for 30 Days Detail\365 Summary: 250GB
+(If Wmata decide to hold Fault data for longer, the size of the database grows exponentially)
+AVM3Reports
+               Current Size: 6GB
+               Estimated Max Size: 10GB
+
+Current Backup Cycle:  
+               N/A, Backup Volume too small on SQL Server to backup any databases (6GB Volume)
+Recommended Backup Cycle:
+               Full Backup once a week, Differentials once daily every other day, not run between the hours of 12-6am
+
+Smartyard SQL (SQL Mirroring)
+Smartyard
+               Current Size: 140GB
+               Estimated Max Size: 160GB
+Smartyard_Store
+               Current Size: 470GB
+
+Current Backup Cycle:  
+               Transactional Log Backups every 4 Hours
+               No Database Backups currently done
+Recommended Backup Cycle:
+               Full Backup once a week, Differentials once daily every other day, not run between the hours of 5am-4pm
+
+
+RTLSSQL (SQL Mirroring)
+Locsystem
+               Current Size: 66GB
+               Estimated Max Size: 100GB
+
+Current Backup Cycle:  
+               Transactional Log Backups every 4 Hours
+               No Database Backups currently done
+Recommended Backup Cycle:
+               Full Backup once a week, Differentials once daily every other day, not run between the hours of 5am-4pm
+
+Master\Model\MSDB-
+For all 3 databases, CleverDevices recommendation is a minimum of Monthly Backups of the (3) System Databases
+For SQL Servers with no High Availability Schema, we recommend these databases be backed up once weekly 
+
+BackupService and Neverfail
+-	Consultants asked if we can add their backup service to our Neverfail Manager so that the service is turned on and off with a Neverfail failover (No I don’t know the name of the service yet),  But I assume that this would be fine
+
+BackupServiceAccount and granting Roles
+-	In terms of the Domain Account Backup Consultants requested, this will need to be handled by Wmata
+-	In terms of granting rights to that account for Software to use, what was requested was access to the BackupOperators role in SQL Server, while Clever Can do the work on the SQL Side, such permissions would need to be approved first by Wmata.  While a database can be backed up with the db_operators role, restores would require much much higher level privileges
+
+Dedicated NIC Card for Backups
+Clever Devices is not against having a dedicated Network Card solely for backups, and we also encourage it as it increases bandwidth between Enterprise Backups and the SQL Servers, the decision would have to be made on Wmata’s end 
+
+for Physical Servers (Whether you have the available additional NIC cards to add to the server and Net Infrastructure to support it) and it would have to be identical adds on both NF nodes
+for Virtual SQL Servers(New Virtual Nics would need to be configured for the Virtual machines), Wmata would also need to see of the VMware infra has the bandwidth to support the additional card, such changes must also be made on both nodes of virtual NF machines
+
+Accessing SQL Server through IP Address and not Hostname
+I have spoken with Clever Group and @Rick Burns is correct, no IP swaps are made at  Wmata for NeverFail only Hostnames
+If you decide to use dedicated Network cards for Backups this point is moot 
+But if you don’t, Enterprise Backup must someone have have a notice trigger that it uses to know which Neverfail node is active
+For such reasons, it might be advisable for Backups to reference via Hostnames as well, if not it may be more difficult in make the assertion on which node is actie to perform  a backup
+
