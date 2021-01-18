@@ -1,11 +1,101 @@
 #!/usr/bin/env raku
 
+=begin pod
+
+#   Storage (Legacy)
+
+DEFINE DEVCLASS DP4SQL DEVTYPE=FILE DIRECTORY=/ispserver/<ISP-instance>/stgpools/DP4SQL/vol01,/ispserver/<ISP-instance>/stgpools/DP4SQL/vol02
+DEFINE STGPOOL                   TRAP DISK
+DEFINE STGPOOL  DP4SQL_TAPE_2OF2 <LTO8DEVCLASS> POOLTYPE=COPY    MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: - CSP'                     RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_TAPE_1OF1 <LTO8DEVCLASS> POOLTYPE=PRIMARY MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: no replication, PSP only'  RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_TAPE_1OF2 <LTO8DEVCLASS> POOLTYPE=PRIMARY MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: no replication, PSP & CSP' RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_DISK_1OF1 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20   MAXSIZE=200G NEXTSTGPOOL=DP4SQL_TAPE_1OF1 DESCRIPTION='DP4SQL: replicated,     PSP only'  RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_DISK_1OF2 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20   MAXSIZE=200G NEXTSTGPOOL=DP4SQL_TAPE_1OF2 DESCRIPTION='DP4SQL: replicated,     PSP & CSP' RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+
+/* BACKUP STGPOOL  DP4SQL_TAPE_1OF2 DP4SQL_TAPE_2OF2 */
+/* BACKUP STGPOOL  DP4SQL_DISK_1OF2 DP4SQL_TAPE_2OF2 */
+/* SET DRMPRIMSTGPOOL <all-current>,DP4SQL_TAPE_1OF1,DP4SQL_TAPE_1OF2,DP4SQL_DISK_1OF1,DP4SQL_DISK_1OF2 */
+/* SET DRMCOPYSTGPOOL <all-current>,DP4SQL_TAPE_2OF2 */
+
+#   Policy
+
+DEFINE   DOMAIN       DP4SQL ARCHRETENTION=90 BACKRETENTION=90
+DEFINE   POLICYSET    DP4SQL STANDARD
+DEFINE   MGMTCLASS    DP4SQL STANDARD STANDARD                            MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD STANDARD      STANDARD TYPE=ARCHIVE    DESTINATION=DP4SQL_DISK_1OF1 RETVER=90
+DEFINE   COPYGROUP    DP4SQL STANDARD STANDARD      STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+ASSIGN   DEFMGMTCLASS DP4SQL STANDARD STANDARD
+ 
+DEFINE   MGMTCLASS    DP4SQL STANDARD D7_TAPE_1OF1                        MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_TAPE_1OF1 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D7_TAPE_1OF2                        MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_TAPE_1OF2 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D7_DISK_1OF1                        MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_DISK_1OF1 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D7_DISK_1OF2                        MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_DISK_1OF2 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+
+DEFINE   MGMTCLASS    DP4SQL STANDARD D15_TAPE_1OF1                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D15_TAPE_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D15_DISK_1OF1                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D15_DISK_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+
+DEFINE   MGMTCLASS    DP4SQL STANDARD D35_TAPE_1OF1                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D35_TAPE_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D35_DISK_1OF1                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D35_DISK_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+
+DEFINE   MGMTCLASS    DP4SQL STANDARD D90_TAPE_1OF1                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D90_TAPE_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D90_DISK_1OF1                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D90_DISK_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+
+DEFINE   MGMTCLASS    DP4SQL STANDARD D720_TAPE_1OF1                      MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_TAPE_1OF1 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D720_TAPE_1OF2                      MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_TAPE_1OF2 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D720_DISK_1OF1                      MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_DISK_1OF1 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D720_DISK_1OF2                      MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_DISK_1OF2 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+
+VALIDATE POLICYSET    DP4SQL STANDARD
+ACTIVATE POLICYSET    DP4SQL STANDARD
+
+
+#   FULL
+#   DIFF
+#   LOGS
+#   META
+#   MMM
+
+=end pod
+
+#   make a shortcut for the DP4SQL MMC GUI
+#   DEF CLOPTSET, then REG NODE CLO=, then @client-options.push: `INCLEXCL statements controlling the MGMTCLASS`
+#
+#   DEFINE CLIENTOPT $sql-server-instance-name.COS INCLEXCL "INCLUDE '$sql-server-name\$sql-server-instance-name\meta\...\*' SQLMETA.MGMT"
+
  my Str $isp-server-ip-label        = 'catsmdev01';
  my Str $isp-server-ip-address      = '10.11.101.39';
  my Str $never-fail-host-name       = 'CTBUSRTO1DB1Qv';
 #my Str $client-ip-label            = 'CTBUSRT1DB1MGT'; my Str $client-ip-address = '10.11.138.147';
  my Str $client-ip-label            = 'CTBUSRT1DB2MGT'; my Str $client-ip-address = '10.11.139.145';
- my Str  $sql-server-instance       = 'RTSQL';
+
+ my Str  $sql-server-name           = 'CTBUSRTO1DB1Qv';
+ my Str  $sql-server-instance-name  = 'RTSQL';
 
  my Str $config-drive               = '%SYSTEMDRIVE%';
  my Str $config-base-directory      = $config-drive ~ '\WMATA\ITIO\EnterpriseBackup\ISP\NODES';
@@ -22,12 +112,12 @@ sub pasteable-backup-archive-configuration-file {
     my Str  $contact                = 'Burns, Richard';
     my Str  $email-address          = 'itappsbusteam@wmata.com';
     my Int  $maxnummp               = 2;
-    my Str  $domain                 = 'WIND.DOM';
-    my Str  $cos                    = 'WIN.COS';
+    my Str  $domain                 = 'DP4SQL';
+    my Str  $ba-cos                 = 'WIN.COS';
     my Str  $schedule               = '1800';
     put 'REGISTER NODE '
         ~ $NODENAME ~ ' '           ~ $password         ~ ' '
-        ~ 'CLOPTSET='               ~ $cos              ~ ' '
+        ~ 'CLOPTSET='               ~ $ba-cos           ~ ' '
         ~ 'DOMAIN='                 ~ $domain           ~ ' '
         ~ 'MAXNUMMP='               ~ $maxnummp         ~ ' '
         ~ 'USER=NONE'                                   ~ ' '
@@ -98,7 +188,7 @@ sub pasteable-backup-archive-configuration-file {
 sub pasteable-dp4sql-configuration-files {
     $HTTPPORT                      += 2;
     $WEBPORT                       += 2;
-    my Str  $NODENAME               = $sql-server-instance ~ '_SQL';
+    my Str  $NODENAME               = $sql-server-instance-name ~ '_SQL';
     my Str  @exclude-dbs            = <CleverCAD CleverCAD_Cadstore>;
     my Str  $EXCLUDEDB              = '/EXCLUDEDB=master,model,msdb';
     $EXCLUDEDB                     ~= ',' ~ @exclude-dbs.join(',') if @exclude-dbs;
@@ -108,8 +198,8 @@ sub pasteable-dp4sql-configuration-files {
     my Str  $contact                = 'Burns, Richard';
     my Str  $email-address          = 'itappsbusteam@wmata.com';
     my Int  $maxnummp               = 5;
-    my Str  $domain                 = 'MSSQL.DOM';
-    my Str  $cos                    = $NODENAME ~ '.COS';
+    my Str  $domain                 = 'DP4SQL';
+    my Str  $cos                    = $NODENAME;
     my Str  $schedule               = '1900';
     my Int  $default-stripes        = 1;
     my Int  $log-prune              = 60;
@@ -187,7 +277,7 @@ sub pasteable-dp4sql-configuration-files {
     ECHO LOGFILE            \qq[$node-base-directory]\tdpsql.log >> \qq[$tdpsql-cfg-file]
     ECHO LOGPRUNE           \qq[$log-prune] >> \qq[$tdpsql-cfg-file]
     ECHO SQLAUTHENTICATION  INTEGRATED >> \qq[$tdpsql-cfg-file]
-    ECHO SQLSERVER          lpc:\qq[$sql-server-instance] >> \qq[$tdpsql-cfg-file]
+    ECHO SQLSERVER          lpc:\qq[$sql-server-instance-name] >> \qq[$tdpsql-cfg-file]
     ECHO STRIPES            \qq[$default-stripes] >> \qq[$tdpsql-cfg-file]
 
     MKDIR \qq[$scripts-base-directory]
@@ -281,9 +371,9 @@ pasteable-dp4sql-configuration-files();
 =finish
 
 RTSQL (NeverFail)                                                                                                   [      S]@MMM_FULL_BACKUP
-CleverCAD                       Current Size:43GB   Estimated Max Size:85GB     [hourly]@LOGS_BACKUP_CleverCAD.BAT  [SMTWTFS]@FULL_BACKUP_CleverCAD.BAT
-CleverCAD_Cadstore              Current Size:5.8 TB Estimated Max Size 8TB                                          [S      ]@FULL_BACKUP_CleverCAD_Cadstore.BAT    [ MTWTFS]@DIFF_BACKUP_CleverCAD_Cadstore.BAT
-CleverCAD_ProcessController     Current Size:20MB                                                                   [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
+CleverCAD                   35  Current Size:43GB   Estimated Max Size:85GB     [hourly]@LOGS_BACKUP_CleverCAD.BAT  [SMTWTFS]@FULL_BACKUP_CleverCAD.BAT
+CleverCAD_Cadstore          720 Current Size:5.8 TB Estimated Max Size 8TB                                          [S      ]@FULL_BACKUP_CleverCAD_Cadstore.BAT    [ MTWTFS]@DIFF_BACKUP_CleverCAD_Cadstore.BAT
+CleverCAD_ProcessController 35  Current Size:20MB                                                                   [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
 CleverCAD_Staging               Current Size:2GB                                                                    [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
 Schedule                        Current Size:23MB   Estimated Max Size: 25GB                                        [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
 Security                        Current Size:23MB                                                                   [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
@@ -302,27 +392,14 @@ Recommended Backup Cycle:
                For remaining CAD Databases, follow Cleverworks Schedules
 
 RPSQL (NeverFail)
-CleverReportsDW
-Current Size:2.6 TB
-Estimated Max Size for 2 Years: 2.8TB
-CleverReportsWeb
-Current Size:9GB
-Estimated Max Size: 9GB
-CRPreprocessor
-Current Size:450GB
-Estimated Max Size: 475GB
-Ridecheck_Washington
-Current Size:1.3TB
-Estimated Max Size : N/A Ongoing, no retention limit
-BuslinkAS
-Current Size:7GB
-BuslinkDS
-Current Size:1GB
-FleetManager
-Current Size:1GB
-RSMIngester
-Current Size:70GB
-Estimated Max Size: 100GB
+CleverReportsDW                 Current Size:2.6 TB Estimated Max Size for 2 Years: 2.8TB
+CleverReportsWeb                Current Size:9GB    Estimated Max Size: 9GB
+CRPreprocessor                  Current Size:450GB  Estimated Max Size: 475GB
+Ridecheck_Washington            Current Size:1.3TB  Estimated Max Size : N/A Ongoing, no retention limit
+BuslinkAS                       Current Size:7GB
+BuslinkDS                       Current Size:1GB
+FleetManager                    Current Size:1GB
+RSMIngester                     Current Size:70GB   Estimated Max Size: 100GB
 
 Current Backup Cycle:  
                N/A, Backup Volume too small on SQL Server to backup any databases (6GB Volume)
@@ -330,13 +407,8 @@ Recommended Backup Cycle:
                Full Backup once a week, Differentials once daily every other day , not run between the hours of 12-6am
 
 AVMSQL (NeverFail)
-AVM3
-Current Size:210GB
-Estimated Max Size for 30 Days Detail\365 Summary: 250GB
-(If Wmata decide to hold Fault data for longer, the size of the database grows exponentially)
-AVM3Reports
-               Current Size: 6GB
-               Estimated Max Size: 10GB
+AVM3                            Current Size:210GB  Estimated Max Size for 30 Days Detail\365 Summary: 250GB (If Wmata decide to hold Fault data for longer, the size of the database grows exponentially)
+AVM3Reports                     Current Size: 6GB   Estimated Max Size: 10GB
 
 Current Backup Cycle:  
                N/A, Backup Volume too small on SQL Server to backup any databases (6GB Volume)
@@ -344,11 +416,8 @@ Recommended Backup Cycle:
                Full Backup once a week, Differentials once daily every other day, not run between the hours of 12-6am
 
 Smartyard SQL (SQL Mirroring)
-Smartyard
-               Current Size: 140GB
-               Estimated Max Size: 160GB
-Smartyard_Store
-               Current Size: 470GB
+Smartyard                       Current Size: 140GB Estimated Max Size: 160GB
+Smartyard_Store                 Current Size: 470GB
 
 Current Backup Cycle:  
                Transactional Log Backups every 4 Hours
@@ -358,9 +427,7 @@ Recommended Backup Cycle:
 
 
 RTLSSQL (SQL Mirroring)
-Locsystem
-               Current Size: 66GB
-               Estimated Max Size: 100GB
+Locsystem                       Current Size: 66GB  Estimated Max Size: 100GB
 
 Current Backup Cycle:  
                Transactional Log Backups every 4 Hours
@@ -388,6 +455,5 @@ for Virtual SQL Servers(New Virtual Nics would need to be configured for the Vir
 Accessing SQL Server through IP Address and not Hostname
 I have spoken with Clever Group and @Rick Burns is correct, no IP swaps are made at  Wmata for NeverFail only Hostnames
 If you decide to use dedicated Network cards for Backups this point is moot 
-But if you don’t, Enterprise Backup must someone have have a notice trigger that it uses to know which Neverfail node is active
+But if you don't, Enterprise Backup must someone have have a notice trigger that it uses to know which Neverfail node is active
 For such reasons, it might be advisable for Backups to reference via Hostnames as well, if not it may be more difficult in make the assertion on which node is actie to perform  a backup
-
