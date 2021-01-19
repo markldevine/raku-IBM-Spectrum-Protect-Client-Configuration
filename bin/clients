@@ -2,19 +2,29 @@
 
 =begin pod
 
+To do:
+(1) review retentions with Michael & Rick
+    - should I really implement the fine-grained retentions in the spreadsheet, or just catch-all at 35 days?
+(2) get storage
+(3) get server configured
+(4) get clients configured
+
 #   Storage (Legacy)
 
 DEFINE DEVCLASS DP4SQL DEVTYPE=FILE DIRECTORY=/ispserver/<ISP-instance>/stgpools/DP4SQL/vol01,/ispserver/<ISP-instance>/stgpools/DP4SQL/vol02
-DEFINE STGPOOL                   TRAP DISK
-DEFINE STGPOOL  DP4SQL_TAPE_2OF2 <LTO8DEVCLASS> POOLTYPE=COPY    MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: - CSP'                     RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
-DEFINE STGPOOL  DP4SQL_TAPE_1OF1 <LTO8DEVCLASS> POOLTYPE=PRIMARY MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: no replication, PSP only'  RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
-DEFINE STGPOOL  DP4SQL_TAPE_1OF2 <LTO8DEVCLASS> POOLTYPE=PRIMARY MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: no replication, PSP & CSP' RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
-DEFINE STGPOOL  DP4SQL_DISK_1OF1 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20   MAXSIZE=200G NEXTSTGPOOL=DP4SQL_TAPE_1OF1 DESCRIPTION='DP4SQL: replicated,     PSP only'  RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
-DEFINE STGPOOL  DP4SQL_DISK_1OF2 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20   MAXSIZE=200G NEXTSTGPOOL=DP4SQL_TAPE_1OF2 DESCRIPTION='DP4SQL: replicated,     PSP & CSP' RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  TRAP             DISK
+DEFINE STGPOOL  DP4SQL_TAPE_2OF2 <LTO8DEVCLASS> POOLTYPE=COPY    MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: - CSP on tape'                      RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_TAPE_1OF1 <LTO8DEVCLASS> POOLTYPE=PRIMARY MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: - PSP on tape'                      RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_TAPE_1OF2 <LTO8DEVCLASS> POOLTYPE=PRIMARY MAXSCRATCH=9999                                           DESCRIPTION='DP4SQL: - PSP on tape + CSP on tape'        RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_DISK_1OF1 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20                                             DESCRIPTION='DP4SQL: - PSP on disk only'                 RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_DISK_1OF2 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20                                             DESCRIPTION='DP4SQL: - PSP on disk only + CSP on tape'   RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_DKTP_1OF1 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20   MAXSIZE=200G NEXTSTGPOOL=DP4SQL_TAPE_1OF1 DESCRIPTION='DP4SQL: - PSP on disk & tape'               RECLAIM=100  RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
+DEFINE STGPOOL  DP4SQL_DKTP_1OF2 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20   MAXSIZE=200G NEXTSTGPOOL=DP4SQL_TAPE_1OF2 DESCRIPTION='DP4SQL: - PSP on disk & tape + CSP on tape' RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO REUSEDELAY=<DRMDBBACKUPEXPIREDAYS>
 
 /* BACKUP STGPOOL  DP4SQL_TAPE_1OF2 DP4SQL_TAPE_2OF2 */
 /* BACKUP STGPOOL  DP4SQL_DISK_1OF2 DP4SQL_TAPE_2OF2 */
-/* SET DRMPRIMSTGPOOL <all-current>,DP4SQL_TAPE_1OF1,DP4SQL_TAPE_1OF2,DP4SQL_DISK_1OF1,DP4SQL_DISK_1OF2 */
+/* BACKUP STGPOOL  DP4SQL_DKTP_1OF2 DP4SQL_TAPE_2OF2 */
+/* SET DRMPRIMSTGPOOL <all-current>,DP4SQL_TAPE_1OF1,DP4SQL_TAPE_1OF2,DP4SQL_DISK_1OF1,DP4SQL_DISK_1OF2,DP4SQL_DKTP_1OF1,DP4SQL_DKTP_1OF2 */
 /* SET DRMCOPYSTGPOOL <all-current>,DP4SQL_TAPE_2OF2 */
 
 #   Policy
@@ -22,71 +32,106 @@ DEFINE STGPOOL  DP4SQL_DISK_1OF2 DP4SQL         POOLTYPE=PRIMARY MAXSCRATCH=20  
 DEFINE   DOMAIN       DP4SQL ARCHRETENTION=90 BACKRETENTION=90
 DEFINE   POLICYSET    DP4SQL STANDARD
 DEFINE   MGMTCLASS    DP4SQL STANDARD STANDARD                            MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD STANDARD      STANDARD TYPE=ARCHIVE    DESTINATION=DP4SQL_DISK_1OF1 RETVER=90
-DEFINE   COPYGROUP    DP4SQL STANDARD STANDARD      STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD STANDARD      STANDARD TYPE=ARCHIVE    DESTINATION=DP4SQL_DISK_1OF1 RETVER=30
+DEFINE   COPYGROUP    DP4SQL STANDARD STANDARD      STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=30 RETONLY=30 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 ASSIGN   DEFMGMTCLASS DP4SQL STANDARD STANDARD
- 
+
 DEFINE   MGMTCLASS    DP4SQL STANDARD D7_TAPE_1OF1                        MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D7_TAPE_1OF1 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D7_TAPE_1OF2                        MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D7_TAPE_1OF2 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D7_DISK_1OF1                        MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D7_DISK_1OF1 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D7_DISK_1OF2                        MIGDESTINATION=TRAP
+DEFINE   MGMTCLASS    DP4SQL STANDARD D7_DKTP_1OF1                        MIGDESTINATION=TRAP
+DEFINE   MGMTCLASS    DP4SQL STANDARD D7_DKTP_1OF2                        MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_TAPE_1OF1 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_TAPE_1OF2 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_DISK_1OF1 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   COPYGROUP    DP4SQL STANDARD D7_DISK_1OF2 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_DKTP_1OF1 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D7_DKTP_1OF2 STANDARD TYPE=BACKUP      DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 
 DEFINE   MGMTCLASS    DP4SQL STANDARD D15_TAPE_1OF1                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D15_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D15_TAPE_1OF2                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D15_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D15_DISK_1OF1                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D15_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D15_DISK_1OF2                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D15_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=15 RETONLY=15 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D15_DKTP_1OF1                       MIGDESTINATION=TRAP
+DEFINE   MGMTCLASS    DP4SQL STANDARD D15_DKTP_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_DKTP_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D15_DKTP_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 
 DEFINE   MGMTCLASS    DP4SQL STANDARD D35_TAPE_1OF1                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D35_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D35_TAPE_1OF2                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D35_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D35_DISK_1OF1                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D35_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D35_DISK_1OF2                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D35_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=35 RETONLY=35 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D35_DKTP_1OF1                       MIGDESTINATION=TRAP
+DEFINE   MGMTCLASS    DP4SQL STANDARD D35_DKTP_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_DKTP_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D35_DKTP_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 
 DEFINE   MGMTCLASS    DP4SQL STANDARD D90_TAPE_1OF1                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D90_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D90_TAPE_1OF2                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D90_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D90_DISK_1OF1                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D90_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D90_DISK_1OF2                       MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D90_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=90 RETONLY=90 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D90_DKTP_1OF1                       MIGDESTINATION=TRAP
+DEFINE   MGMTCLASS    DP4SQL STANDARD D35_DKTP_1OF2                       MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_TAPE_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_TAPE_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_DISK_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_DISK_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_DKTP_1OF1 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D90_DKTP_1OF2 STANDARD TYPE=BACKUP     DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 
 DEFINE   MGMTCLASS    DP4SQL STANDARD D720_TAPE_1OF1                      MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D720_TAPE_1OF1 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D720_TAPE_1OF2                      MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D720_TAPE_1OF2 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D720_DISK_1OF1                      MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D720_DISK_1OF1 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 DEFINE   MGMTCLASS    DP4SQL STANDARD D720_DISK_1OF2                      MIGDESTINATION=TRAP
-DEFINE   COPYGROUP    DP4SQL STANDARD D720_DISK_1OF2 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=720 RETONLY=720 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   MGMTCLASS    DP4SQL STANDARD D720_DKTP_1OF1                      MIGDESTINATION=TRAP
+DEFINE   MGMTCLASS    DP4SQL STANDARD D720_DKTP_1OF2                      MIGDESTINATION=TRAP
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_TAPE_1OF1 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_TAPE_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_TAPE_1OF2 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_TAPE_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_DISK_1OF1 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_DISK_1OF2 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_DKTP_1OF1 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF1 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+DEFINE   COPYGROUP    DP4SQL STANDARD D720_DKTP_1OF2 STANDARD TYPE=BACKUP    DESTINATION=DP4SQL_DISK_1OF2 RETEXTRA=7 RETONLY=7 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
 
 VALIDATE POLICYSET    DP4SQL STANDARD
 ACTIVATE POLICYSET    DP4SQL STANDARD
 
+my $client-option-set   = $NODENAME;
+my $seqence-number      = 100;
+DEFINE CLOPTSET  $client-option-set
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\meta\*'              D35_DISK_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\full*'      D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\full*\*'    D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\diff*'      D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\diff*\*'    D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\log*'       D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\log*\...\*' D35_DKTP_1OF2" SEQ=$sequence-number++
+for @exclude-dbs -> $db-name {
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\full*'      D35_TAPE_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\full*\*'    D35_TAPE_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\diff*'      D35_DKTP_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\diff*\*'    D35_DKTP_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\log*'       D35_DKTP_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\log*\...\*' D35_DKTP_1OF2" SEQ=$sequence-number++
+}
 
-#   FULL
-#   DIFF
-#   LOGS
-#   META
-#   MMM
+DEFINE SCHEDULE
+DEFINE SCHEDULE SQL USSBYSQLD806DTC_FULL ACTION=COMMAND OBJECTS='"C:\Program Files\Tivoli\TSM\TDPSql\SCRIPTS\USSBYSQLD806DTC_FULL_BACKUP.CMD"' STARTTIME=21:00:00
+DEFINE SCHEDULE SQL USSBYSQLD806DTC_LOGS ACTION=COMMAND OBJECTS='"C:\Program Files\Tivoli\TSM\TDPSql\SCRIPTS\USSBYSQLD806DTC_LOGS_BACKUP.CMD"' STARTTIME=00:30:00 PERIOD=4 PERUNITS=HOURS DURATION=30 DURUNITS=MINUTES
+
+
 
 =end pod
 
-#   make a shortcut for the DP4SQL MMC GUI
 #   DEF CLOPTSET, then REG NODE CLO=, then @client-options.push: `INCLEXCL statements controlling the MGMTCLASS`
-#
-#   DEFINE CLIENTOPT $sql-server-instance-name.COS INCLEXCL "INCLUDE '$sql-server-name\$sql-server-instance-name\meta\...\*' SQLMETA.MGMT"
 
  my Str $isp-server-ip-label        = 'catsmdev01';
  my Str $isp-server-ip-address      = '10.11.101.39';
@@ -98,11 +143,13 @@ ACTIVATE POLICYSET    DP4SQL STANDARD
  my Str  $sql-server-instance-name  = 'RTSQL';
 
  my Str $config-drive               = '%SYSTEMDRIVE%';
+ my Str $baapi-product-directory    = $config-drive ~ '\Program Files\Tivoli\TSM\baclient';
+ my Str $dp4sql-product-directory   = $config-drive ~ '\Program Files\Tivoli\TSM\TDPSql';
  my Str $config-base-directory      = $config-drive ~ '\WMATA\ITIO\EnterpriseBackup\ISP\NODES';
  my Int $HTTPPORT                   = 1581 - 2;
  my Int $WEBPORT                    = 1582 - 2;
 
-sub pasteable-backup-archive-configuration-file {
+sub pasteable-backup-archive-configuration-file () {
     $HTTPPORT                      += 2;
     $WEBPORT                       += 2;
 #   my Str  $NODENAME               = $never-fail-host-name.uc;
@@ -120,14 +167,14 @@ sub pasteable-backup-archive-configuration-file {
         ~ 'CLOPTSET='               ~ $ba-cos           ~ ' '
         ~ 'DOMAIN='                 ~ $domain           ~ ' '
         ~ 'MAXNUMMP='               ~ $maxnummp         ~ ' '
-        ~ 'USER=NONE'                                   ~ ' '
+        ~ 'USER='                   ~ $NODENAME         ~ ' '
         ~ 'EMAILADDRESS='           ~ $email-address    ~ ' '
         ~ 'CONTACT="'               ~ $contact          ~ '"';
     put 'DEFINE ASSOCIATION '
         ~ $domain                                       ~ ' '
         ~ $schedule                                     ~ ' '
         ~ $NODENAME;
-    my Str  $DOMAIN                 = '"C:"';
+    my Str  $DOMAIN                 = '"' ~ $config-drive ~ '"';
     my Str  $ERRORLOGRETENTION      = '14 D';
     my Str  $SCHEDLOGRETENTION      = '14 D';
     my Str  $dsm-opt-file           = $node-base-directory ~ '\\' ~ 'dsm.opt';
@@ -144,9 +191,13 @@ sub pasteable-backup-archive-configuration-file {
     ECHO  COMMMETHOD                 TCPIP >> \qq[$dsm-opt-file]
     ECHO  COMPRESSALWAYS             YES >> \qq[$dsm-opt-file]
     ECHO  COMPRESSION                NO >> \qq[$dsm-opt-file]
+    ECHO  DEDUPCACHEPATH             /"\qq[$node-base-directory]\DEDUPCACHE"  >> \qq[$dsm-opt-file]
+    ECHO  DEDUPCACHESIZE             2048  >> \qq[$dsm-opt-file]
+    ECHO  DEDUPLICATION              NO  >> \qq[$dsm-opt-file]
     ECHO  DISKBUFFSIZE               32 >> \qq[$dsm-opt-file]
     ECHO  DOMAIN                     \qq[$DOMAIN] >> \qq[$dsm-opt-file]
     ECHO  ENABLEINSTRUMENTATION      NO >> \qq[$dsm-opt-file]
+    ECHO  ENABLEDEDUPCACHE           NO >> \qq[$dsm-opt-file]
     ECHO  ERRORLOGNAME               "\qq[$node-base-directory]\dsmerror.log" >> \qq[$dsm-opt-file]
     ECHO  ERRORLOGRETENTION          \qq[$ERRORLOGRETENTION] >> \qq[$dsm-opt-file]
     ECHO  HTTPPORT                   \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
@@ -172,7 +223,7 @@ sub pasteable-backup-archive-configuration-file {
     ECHO  TXNBYTELIMIT               25600K >> \qq[$dsm-opt-file]
     ECHO  WEBPORTS                   \qq[$WEBPORT] \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
 
-    SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient
+    SET DSM_DIR=\qq[$baapi-product-directory]
     ECHO %PATH% | FIND /I "%DSM_DIR%" > DSM_DIR_CHECK.TST
     FOR %I IN (DSM_DIR_CHECK.TST) DO SET DSM_DIR_CHECK=%~zI
     IF %DSM_DIR_CHECK% EQU 0 SET PATH=%DSM_DIR%;%PATH%
@@ -180,12 +231,12 @@ sub pasteable-backup-archive-configuration-file {
     dsmc query session -optfile=\qq[$dsm-opt-file]
     dsmcutil install scheduler /name:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:no /startnow:no /optfile:"\qq[$dsm-opt-file]"
     dsmcutil install cad /name:"IBM Spectrum Protect Acceptor: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:yes /startnow:yes /cadschedname:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /optfile:"\qq[$dsm-opt-file]"
-    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsm-shortcut-name]');$s.TargetPath='%SYSTEMDRIVE%\Program Files\Tivoli\TSM\baclient\dsm.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
-    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsmc-shortcut-name]');$s.TargetPath='%SYSTEMDRIVE%\Program Files\Tivoli\TSM\baclient\dsmc.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
+    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsm-shortcut-name]');$s.TargetPath='\qq[$baapi-product-directory]\\dsm.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
+    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsmc-shortcut-name]');$s.TargetPath='\qq[$baapi-product-directory]\\dsmc.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
     ENDOFPASTEABLEBACKUPARCHIVECONFIGURATIONFILE
 }
 
-sub pasteable-dp4sql-configuration-files {
+sub pasteable-dp4sql-configuration-files () {
     $HTTPPORT                      += 2;
     $WEBPORT                       += 2;
     my Str  $NODENAME               = $sql-server-instance-name ~ '_SQL';
@@ -211,7 +262,7 @@ sub pasteable-dp4sql-configuration-files {
         ~ 'CLOPTSET='               ~ $cos              ~ ' '
         ~ 'DOMAIN='                 ~ $domain           ~ ' '
         ~ 'MAXNUMMP='               ~ $maxnummp         ~ ' '
-        ~ 'USER=NONE'                                   ~ ' '
+        ~ 'USER='                   ~ $NODENAME         ~ ' '
         ~ 'BACKDEL=YES'                                 ~ ' '
         ~ 'TXNGROUPMAX=12'                              ~ ' '
         ~ 'EMAILADDRESS='           ~ $email-address    ~ ' '
@@ -220,13 +271,14 @@ sub pasteable-dp4sql-configuration-files {
         ~ $domain                                       ~ ' '
         ~ $schedule                                     ~ ' '
         ~ $NODENAME;
-    my Str  $DOMAIN                 = '"C:"';
+    my Str  $DOMAIN                 = '"' ~ $config-drive ~ '"';
     my Str  $ERRORLOGRETENTION      = '14 D';
     my Str  $SCHEDLOGRETENTION      = '14 D';
     my Str  $dsm-opt-file           = $node-base-directory ~ '\\' ~ 'dsm.opt';
     my Str  $dsm-shortcut-name      = 'dsm.lnk';
     my Str  $dsmc-shortcut-name     = 'dsmc.lnk';
     my Str  $tdpsql-cfg-file        = $node-base-directory ~ '\\' ~ 'tdpsql.cfg';
+    my Str  $tdpsql-shortcut-name   = 'tdpsql.lnk';
 
     put q:to/ENDOFPASTEABLEDP4SQLCONFIGURATIONFILES/; 
 
@@ -260,7 +312,7 @@ sub pasteable-dp4sql-configuration-files {
     ECHO  TXNBYTELIMIT               25600K >> \qq[$dsm-opt-file]
     ECHO  WEBPORTS                   \qq[$WEBPORT] \qq[$HTTPPORT] >> \qq[$dsm-opt-file]
 
-    SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient
+    SET DSM_DIR=\qq[$baapi-product-directory]
     ECHO %PATH% | FIND /I "%DSM_DIR%" > DSM_DIR_CHECK.TST
     FOR %I IN (DSM_DIR_CHECK.TST) DO SET DSM_DIR_CHECK=%~zI
     IF %DSM_DIR_CHECK% EQU 0 SET PATH=%DSM_DIR%;%PATH%
@@ -269,13 +321,15 @@ sub pasteable-dp4sql-configuration-files {
     dsmcutil install scheduler /name:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:no /startnow:no /optfile:"\qq[$dsm-opt-file]"
     SC.EXE CONFIG "IBM Spectrum Protect Scheduler: \qq[$NODENAME]" obj= "WMATA\ITIOISPSQLSRV" password= ""
     dsmcutil install cad /name:"IBM Spectrum Protect Acceptor: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:yes /startnow:yes /cadschedname:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /optfile:"\qq[$dsm-opt-file]"
-    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsm-shortcut-name]');$s.TargetPath='%SYSTEMDRIVE%\Program Files\Tivoli\TSM\baclient\dsm.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
-    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsmc-shortcut-name]');$s.TargetPath='%SYSTEMDRIVE%\Program Files\Tivoli\TSM\baclient\dsmc.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
+    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsm-shortcut-name]');$s.TargetPath='\qq[$baapi-product-directory]\\dsm.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
+    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsmc-shortcut-name]');$s.TargetPath='\qq[$baapi-product-directory]\\dsmc.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
+    powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$tdpsql-shortcut-name]');$s.TargetPath='\qq[$dp4sql-product-directory]\\tdpsql.exe';$s.Arguments='\\"/tsmoptfile=\qq[$dsm-opt-file] /configfile=\qq[$tdpsql-cfg-file]\\"';$s.Save()"
 
     ECHO BACKUPDESTINATION  TSM > \qq[$tdpsql-cfg-file]
     ECHO BACKUPMETHOD       LEGACY >> \qq[$tdpsql-cfg-file]
     ECHO LOGFILE            \qq[$node-base-directory]\tdpsql.log >> \qq[$tdpsql-cfg-file]
     ECHO LOGPRUNE           \qq[$log-prune] >> \qq[$tdpsql-cfg-file]
+    ECHO MOUNTWAIT          YES >> \qq[$tdpsql-cfg-file]
     ECHO SQLAUTHENTICATION  INTEGRATED >> \qq[$tdpsql-cfg-file]
     ECHO SQLSERVER          lpc:\qq[$sql-server-instance-name] >> \qq[$tdpsql-cfg-file]
     ECHO STRIPES            \qq[$default-stripes] >> \qq[$tdpsql-cfg-file]
@@ -284,10 +338,10 @@ sub pasteable-dp4sql-configuration-files {
     CD /D \qq[$scripts-base-directory]
 
     ECHO CHCP 1252 > \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
-    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO SET DSM_DIR=\qq[$baapi-product-directory] >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
     ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
     ECHO PUSHD . >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
-    ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
+    ECHO CHDIR /D "\qq[$dp4sql-product-directory]" >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
     ECHO SET RC=0 >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
     ECHO TDPSQLC BACKUP master,model,msdb FULL /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
     ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
@@ -295,10 +349,10 @@ sub pasteable-dp4sql-configuration-files {
     ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\MMM_FULL_BACKUP.BAT
 
     ECHO CHCP 1252 > \qq[$scripts-base-directory]\FULL_BACKUP.BAT
-    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO SET DSM_DIR=\qq[$baapi-product-directory] >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
     ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
     ECHO PUSHD . >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
-    ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
+    ECHO CHDIR /D "\qq[$dp4sql-product-directory]" >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
     ECHO SET RC=0 >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
     ECHO TDPSQLC BACKUP * FULL \qq[$EXCLUDEDB] /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
     ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
@@ -306,10 +360,10 @@ sub pasteable-dp4sql-configuration-files {
     ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\FULL_BACKUP.BAT
 
     ECHO CHCP 1252 > \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
-    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO SET DSM_DIR=\qq[$baapi-product-directory] >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
     ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
     ECHO PUSHD . >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
-    ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
+    ECHO CHDIR /D "\qq[$dp4sql-product-directory]" >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
     ECHO SET RC=0 >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
     ECHO TDPSQLC BACKUP * DIFFFULL \qq[$EXCLUDEDB] /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
     ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
@@ -317,10 +371,10 @@ sub pasteable-dp4sql-configuration-files {
     ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\DIFF_BACKUP.BAT
 
     ECHO CHCP 1252 > \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
-    ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO SET DSM_DIR=\qq[$baapi-product-directory] >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
     ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
     ECHO PUSHD . >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
-    ECHO CD /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
+    ECHO CD /D "\qq[$dp4sql-product-directory]" >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
     ECHO SET RC=0 >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
     ECHO TDPSQLC BACKUP * Log \qq[$EXCLUDEDB] /Truncate=YES /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
     ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\LOGS_BACKUP.BAT
@@ -330,10 +384,10 @@ sub pasteable-dp4sql-configuration-files {
     for @exclude-dbs -> $db {
         put q:to/ENDOFPASTEABLEDP4SQLCONFIGURATIONFILESEXCLUDEDB/;
         ECHO CHCP 1252 > \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
-        ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO SET DSM_DIR=\qq[$baapi-product-directory] >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
         ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
         ECHO PUSHD . >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
-        ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
+        ECHO CHDIR /D "\qq[$dp4sql-product-directory]" >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
         ECHO SET RC=0 >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
         ECHO TDPSQLC BACKUP \qq[$db] FULL /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
         ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
@@ -341,10 +395,10 @@ sub pasteable-dp4sql-configuration-files {
         ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\FULL_BACKUP_\qq[$db].BAT
 
         ECHO CHCP 1252 > \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
-        ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO SET DSM_DIR=\qq[$baapi-product-directory] >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
         ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
         ECHO PUSHD . >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
-        ECHO CHDIR /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
+        ECHO CHDIR /D "\qq[$dp4sql-product-directory]" >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
         ECHO SET RC=0 >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
         ECHO TDPSQLC BACKUP \qq[$db] DIFFFULL /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
         ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
@@ -352,10 +406,10 @@ sub pasteable-dp4sql-configuration-files {
         ECHO EXIT /B ^%RC^% >> \qq[$scripts-base-directory]\DIFF_BACKUP_\qq[$db].BAT
 
         ECHO CHCP 1252 > \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
-        ECHO SET DSM_DIR=C:\Program Files\Tivoli\TSM\baclient >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO SET DSM_DIR=\qq[$baapi-product-directory] >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
         ECHO SET PATH=^%DSM_DIR^%;^%PATH^% >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
         ECHO PUSHD . >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
-        ECHO CD /D "C:\Program Files\Tivoli\TSM\TDPSql" >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
+        ECHO CD /D "\qq[$dp4sql-product-directory]" >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
         ECHO SET RC=0 >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
         ECHO TDPSQLC BACKUP \qq[$db] Log /Truncate=YES /TSMOPTFILE="\qq[$dsm-opt-file]" /CONFIGFILE="\qq[$tdpsql-cfg-file]" >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
         ECHO SET RC=^%ERRORLEVEL^% >> \qq[$scripts-base-directory]\LOGS_BACKUP_\qq[$db].BAT
