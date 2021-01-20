@@ -140,7 +140,8 @@ DEFINE SCHEDULE SQL USSBYSQLD806DTC_LOGS ACTION=COMMAND OBJECTS='"C:\Program Fil
  my Str $client-ip-label            = 'CTBUSRT1DB2MGT'; my Str $client-ip-address = '10.11.139.145';
 
  my Str  $sql-server-name           = 'CTBUSRTO1DB1Qv';
- my Str  $sql-server-instance-name  = 'RTSQL';
+ my Str  $sql-server-instance-name  = $sql-server-name;
+#my Str  $sql-server-instance-name  = 'RTSQL';
 
  my Str $config-drive               = '%SYSTEMDRIVE%';
  my Str $baapi-product-directory    = $config-drive ~ '\Program Files\Tivoli\TSM\baclient';
@@ -155,19 +156,19 @@ sub pasteable-backup-archive-configuration-file () {
 #   my Str  $NODENAME               = $never-fail-host-name.uc;
     my Str  $NODENAME               = $client-ip-label.uc;
     my Str  $node-base-directory    = $config-base-directory ~ '\\' ~ $NODENAME;
-    my Str  $password               = $NODENAME.lc;
+    my Str  $password               = $NODENAME.uc;
     my Str  $contact                = 'Burns, Richard';
     my Str  $email-address          = 'itappsbusteam@wmata.com';
     my Int  $maxnummp               = 2;
-    my Str  $domain                 = 'DP4SQL';
-    my Str  $ba-cos                 = 'WIN.COS';
+    my Str  $domain                 = 'WIND.DOM';
+    my Str  $ba-cos                 = 'WIND.COS';
     my Str  $schedule               = '1800';
     put 'REGISTER NODE '
         ~ $NODENAME ~ ' '           ~ $password         ~ ' '
         ~ 'CLOPTSET='               ~ $ba-cos           ~ ' '
         ~ 'DOMAIN='                 ~ $domain           ~ ' '
         ~ 'MAXNUMMP='               ~ $maxnummp         ~ ' '
-        ~ 'USER='                   ~ $NODENAME         ~ ' '
+        ~ 'USER=NONE'                                   ~ ' '
         ~ 'EMAILADDRESS='           ~ $email-address    ~ ' '
         ~ 'CONTACT="'               ~ $contact          ~ '"';
     put 'DEFINE ASSOCIATION '
@@ -184,14 +185,14 @@ sub pasteable-backup-archive-configuration-file () {
 
     put q:to/ENDOFPASTEABLEBACKUPARCHIVECONFIGURATIONFILE/; 
 
-    MKDIR \qq[$node-base-directory]
+    MKDIR \qq[$node-base-directory]\DEDUPCACHE
     CD /D \qq[$node-base-directory]
     ECHO  CLUSTERDISKSONLY           NO > \qq[$dsm-opt-file]
     ECHO  CLUSTERNODE                NO >> \qq[$dsm-opt-file]
     ECHO  COMMMETHOD                 TCPIP >> \qq[$dsm-opt-file]
     ECHO  COMPRESSALWAYS             YES >> \qq[$dsm-opt-file]
     ECHO  COMPRESSION                NO >> \qq[$dsm-opt-file]
-    ECHO  DEDUPCACHEPATH             /"\qq[$node-base-directory]\DEDUPCACHE"  >> \qq[$dsm-opt-file]
+    ECHO  DEDUPCACHEPATH             "\qq[$node-base-directory]\DEDUPCACHE"  >> \qq[$dsm-opt-file]
     ECHO  DEDUPCACHESIZE             2048  >> \qq[$dsm-opt-file]
     ECHO  DEDUPLICATION              NO  >> \qq[$dsm-opt-file]
     ECHO  DISKBUFFSIZE               32 >> \qq[$dsm-opt-file]
@@ -205,7 +206,7 @@ sub pasteable-backup-archive-configuration-file () {
     ECHO *INSTRLOGMAX                25 >> \qq[$dsm-opt-file]
     ECHO  INSTRLOGNAME               "\qq[$node-base-directory]\dsminstr.log" >> \qq[$dsm-opt-file]
     ECHO  LANGUAGE                   ENU >> \qq[$dsm-opt-file]
-    ECHO  MANAGEDSERVICES            SCHEDULE >> \qq[$dsm-opt-file]
+    ECHO  MANAGEDSERVICES            SCHEDULE WEBCLIENT >> \qq[$dsm-opt-file]
     ECHO  NODENAME                   \qq[$NODENAME] >> \qq[$dsm-opt-file]
     ECHO  PASSWORDACCESS             GENERATE >> \qq[$dsm-opt-file]
     ECHO *PRESCHEDULECMD             "\qq[$node-base-directory]\PREBACKUP.BAT" >> \qq[$dsm-opt-file]
@@ -239,18 +240,19 @@ sub pasteable-backup-archive-configuration-file () {
 sub pasteable-dp4sql-configuration-files () {
     $HTTPPORT                      += 2;
     $WEBPORT                       += 2;
-    my Str  $NODENAME               = $sql-server-instance-name ~ '_SQL';
+    my Str  $NODENAME               = $sql-server-instance-name.uc ~ '-SQL';
     my Str  @exclude-dbs            = <CleverCAD CleverCAD_Cadstore>;
     my Str  $EXCLUDEDB              = '/EXCLUDEDB=master,model,msdb';
     $EXCLUDEDB                     ~= ',' ~ @exclude-dbs.join(',') if @exclude-dbs;
     my Str  $node-base-directory    = $config-base-directory ~ '\\' ~ $NODENAME;
     my Str  $scripts-base-directory = $node-base-directory ~ '\\SCRIPTS';
-    my Str  $password               = $NODENAME.lc;
+#   my Str  $password               = $NODENAME.lc;
+    my Str  $password               = 'admin1234';
     my Str  $contact                = 'Burns, Richard';
     my Str  $email-address          = 'itappsbusteam@wmata.com';
-    my Int  $maxnummp               = 5;
-    my Str  $domain                 = 'DP4SQL';
-    my Str  $cos                    = $NODENAME;
+    my Int  $maxnummp               = 2;
+    my Str  $domain                 = 'MSSQL.DOM';
+    my Str  $cos                    = $NODENAME ~ '.COS';
     my Str  $schedule               = '1900';
     my Int  $default-stripes        = 1;
     my Int  $log-prune              = 60;
@@ -282,12 +284,16 @@ sub pasteable-dp4sql-configuration-files () {
 
     put q:to/ENDOFPASTEABLEDP4SQLCONFIGURATIONFILES/; 
 
-    MKDIR \qq[$node-base-directory]
+    MKDIR \qq[$node-base-directory]\DEDUPCACHE
     CD /D \qq[$node-base-directory]
     ECHO  COMMMETHOD                 TCPIP >> \qq[$dsm-opt-file]
     ECHO  COMPRESSALWAYS             YES >> \qq[$dsm-opt-file]
     ECHO  COMPRESSION                NO >> \qq[$dsm-opt-file]
+    ECHO  DEDUPCACHEPATH             "\qq[$node-base-directory]\DEDUPCACHE"  >> \qq[$dsm-opt-file]
+    ECHO  DEDUPCACHESIZE             2048  >> \qq[$dsm-opt-file]
+    ECHO  DEDUPLICATION              NO  >> \qq[$dsm-opt-file]
     ECHO  DISKBUFFSIZE               32 >> \qq[$dsm-opt-file]
+    ECHO  ENABLEDEDUPCACHE           NO >> \qq[$dsm-opt-file]
     ECHO  ENABLEINSTRUMENTATION      NO >> \qq[$dsm-opt-file]
     ECHO  ERRORLOGNAME               "\qq[$node-base-directory]\dsmerror.log" >> \qq[$dsm-opt-file]
     ECHO  ERRORLOGRETENTION          \qq[$ERRORLOGRETENTION] >> \qq[$dsm-opt-file]
@@ -296,7 +302,7 @@ sub pasteable-dp4sql-configuration-files () {
     ECHO *INSTRLOGMAX                25 >> \qq[$dsm-opt-file]
     ECHO  INSTRLOGNAME               "\qq[$node-base-directory]\dsminstr.log" >> \qq[$dsm-opt-file]
     ECHO  LANGUAGE                   ENU >> \qq[$dsm-opt-file]
-    ECHO  MANAGEDSERVICES            SCHEDULE WEBCLIENT >> \qq[$dsm-opt-file]
+    ECHO  MANAGEDSERVICES            SCHEDULE >> \qq[$dsm-opt-file]
     ECHO  NODENAME                   \qq[$NODENAME] >> \qq[$dsm-opt-file]
     ECHO  PASSWORDACCESS             GENERATE >> \qq[$dsm-opt-file]
     ECHO *PRESCHEDULECMD             "\qq[$node-base-directory]\PREBACKUP.BAT" >> \qq[$dsm-opt-file]
@@ -320,7 +326,7 @@ sub pasteable-dp4sql-configuration-files () {
     dsmc query session -optfile=\qq[$dsm-opt-file]
     dsmcutil install scheduler /name:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:no /startnow:no /optfile:"\qq[$dsm-opt-file]"
     SC.EXE CONFIG "IBM Spectrum Protect Scheduler: \qq[$NODENAME]" obj= "WMATA\ITIOISPSQLSRV" password= ""
-    dsmcutil install cad /name:"IBM Spectrum Protect Acceptor: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:yes /startnow:yes /cadschedname:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /optfile:"\qq[$dsm-opt-file]"
+    dsmcutil install cad /name:"IBM Spectrum Protect Acceptor: \qq[$NODENAME]" /node:\qq[$NODENAME] /password:\qq[$password] /autostart:no /startnow:no /cadschedname:"IBM Spectrum Protect Scheduler: \qq[$NODENAME]" /optfile:"\qq[$dsm-opt-file]"
     powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsm-shortcut-name]');$s.TargetPath='\qq[$baapi-product-directory]\\dsm.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
     powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$dsmc-shortcut-name]');$s.TargetPath='\qq[$baapi-product-directory]\\dsmc.exe';$s.Arguments='\\"-optfile=\qq[$dsm-opt-file]\\"';$s.Save()"
     powershell "$s=(New-Object -COM WScript.Shell).CreateShortcut('\qq[$node-base-directory]\\\qq[$tdpsql-shortcut-name]');$s.TargetPath='\qq[$dp4sql-product-directory]\\tdpsql.exe';$s.Arguments='\\"/tsmoptfile=\qq[$dsm-opt-file] /configfile=\qq[$tdpsql-cfg-file]\\"';$s.Save()"
