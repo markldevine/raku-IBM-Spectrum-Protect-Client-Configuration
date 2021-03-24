@@ -1,13 +1,12 @@
 #!/usr/bin/env raku
 
-my @exclude-dbs = 'CleverCAD_Cadstore';
+my @retentions = 14;
 
 unit sub MAIN(
     Str:D :$directory-container-prefix!,                    #= new directory container STGPOOL prefix (I.e. 'DP4SQL', 'BA')
     Str:D :$tape-devclass                   = 'LTOTAPE',    #= tape DEVCLASS name
-    :$retention                             = 14,           #= number of days to retain backups
+    :$retentions-in-days                    = 30,           #= retentions required
     :$drmdbbackupexpiredays                 = 5,            #= DRMDBBACKUPEXPIREDAYS for REUSEDELAY
-    :$node,                                                 #= optional NODE name
 );
 
 #   Storage
@@ -47,20 +46,22 @@ sub define-policy-stack() {
     DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD STANDARD      STANDARD TYPE=BACKUP     DESTINATION={$directory-container-prefix}_DKTP_1OF1 RETEXTRA=30 RETONLY=30 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
     ASSIGN   DEFMGMTCLASS {$directory-container-prefix} STANDARD STANDARD
     ENDOFDEFINEPOLICYSTACK
-    $output ~= qq:to/ENDOFDEFINEMGMTCLASS/;
-    DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF1                        MIGDESTINATION=TRAP
-    DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF2                        MIGDESTINATION=TRAP
-    DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF1                        MIGDESTINATION=TRAP
-    DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF2                        MIGDESTINATION=TRAP
-    DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF1                        MIGDESTINATION=TRAP
-    DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF2                        MIGDESTINATION=TRAP
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_TAPE_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_TAPE_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    ENDOFDEFINEMGMTCLASS
+    for @retentions -> $retention {
+        $output ~= qq:to/ENDOFDEFINEMGMTCLASS/;
+        DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF1                        MIGDESTINATION=TRAP
+        DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF2                        MIGDESTINATION=TRAP
+        DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF1                        MIGDESTINATION=TRAP
+        DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF2                        MIGDESTINATION=TRAP
+        DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF1                        MIGDESTINATION=TRAP
+        DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF2                        MIGDESTINATION=TRAP
+        DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_TAPE_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+        DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_TAPE_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+        DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+        DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+        DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+        DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+        ENDOFDEFINEMGMTCLASS
+    }
     $output ~= qq:to/ENDOFVALIDATEACTIVATE/;
     VALIDATE POLICYSET    {$directory-container-prefix} STANDARD
     ACTIVATE POLICYSET    {$directory-container-prefix} STANDARD
@@ -68,40 +69,31 @@ sub define-policy-stack() {
     put $output.trans(' ' => ' ', :squash);
 }
 
-sub define-cloptset (Str:D $node) {
-    my $client-option-set   = $node ~ '.COS';
-    my $sequence-number     = 100;
-    my $output = qq:to/ENDOFDEFINECLOPTSETDEFAULTS/;
-    DEFINE CLOPTSET  $client-option-set
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\meta\\*'                 D{$retention}_DISK_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\full*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\full*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\diff*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\diff*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\log*'         D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\log*\\...\\*' D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    ENDOFDEFINECLOPTSETDEFAULTS
-    for @exclude-dbs -> $db-name {
-        $output ~= qq:to/ENDOFDEFINECLOPTSETEXCEPTIONS/;
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\full*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\full*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\diff*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\diff*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\log*'         D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\log*\\...\\*' D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        ENDOFDEFINECLOPTSETEXCEPTIONS
-    }
-    put $output.trans(' ' => ' ', :squash);
-}
-
 define-STGPOOLs;
 update-BACKUP-STGPOOL-script;
 define-policy-stack;
-define-cloptset($node) if $node;
 
 =finish
 
 
+my $client-option-set   = $NODENAME;
+my $seqence-number      = 100;
+DEFINE CLOPTSET  $client-option-set
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\meta\*'              D35_DISK_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\full*'      D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\full*\*'    D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\diff*'      D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\diff*\*'    D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\log*'       D35_DKTP_1OF2" SEQ=$sequence-number++
+DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\...\log*\...\*' D35_DKTP_1OF2" SEQ=$sequence-number++
+for @exclude-dbs -> $db-name {
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\full*'      D35_TAPE_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\full*\*'    D35_TAPE_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\diff*'      D35_DKTP_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\diff*\*'    D35_DKTP_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\log*'       D35_DKTP_1OF2" SEQ=$sequence-number++
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\...\data\$db-name\log*\...\*' D35_DKTP_1OF2" SEQ=$sequence-number++
+}
 
 DEFINE SCHEDULE
 DEFINE SCHEDULE SQL USSBYSQLD806DTC_FULL ACTION=COMMAND OBJECTS='"C:\Program Files\Tivoli\TSM\TDPSql\SCRIPTS\USSBYSQLD806DTC_FULL_BACKUP.CMD"' STARTTIME=21:00:00

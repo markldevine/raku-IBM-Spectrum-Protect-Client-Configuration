@@ -2,15 +2,15 @@
 
 my Str      $isp-server-ip-label    = 'catsmdev01';
 my Str      $isp-server-ip-address  = '10.11.101.39';
-my Str      $client-ip-label        = 'CTBUSRT1DB1MGT';
-my Str      $client-ip-address      = '10.11.138.147';
+my Str      $client-ip-label        = 'DFS2K16-TESTLv';
+my Str      $client-ip-address      = '10.11.121.96';
 #y Str      $client-ip-label        = 'CTBUSRT1DB2MGT';
 #y Str      $client-ip-address      = '10.11.139.145';
 
 my Str      $DOMAIN                 = '"C:"';
-my Str      $ERRORLOGRETENTION      = '14 D';
-my Str      $SCHEDLOGRETENTION      = '14 D';
-my Str      $NODENAME               = 'CTBUSRT1DB1MGT'.uc;
+my Str      $ERRORLOGRETENTION      = '7 D';
+my Str      $SCHEDLOGRETENTION      = '7 D';
+my Str      $NODENAME               = 'DFS2K16-TESTLv'.uc;
 my Str      $password               = $NODENAME.lc;
 my Int      $HTTPPORT               = 1581;
 my Int      $WEBPORT                = 1582;
