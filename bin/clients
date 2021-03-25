@@ -1,10 +1,27 @@
 #!/usr/bin/env raku
 
-my @exclude-dbs = 'CleverCAD_Cadstore';
+#my @exclude-dbs                    = 'CleverCAD_CADStore';
+ my @exclude-dbs                    = ();
+ my Str $isp-server-ip-label        = 'catsmdev01';
+ my Str $isp-server-ip-address      = '10.11.101.39';
+ my Str $never-fail-host-name       = 'CTBUSRTO1DB1Qv';
+#my Str $client-ip-label            = 'CTBUSRT1DB1MGT'; my Str $client-ip-address = '10.11.138.147';
+ my Str $client-ip-label            = 'CTBUSRT1DB2MGT'; my Str $client-ip-address = '10.11.139.145';
+
+ my Str  $sql-server-name           = 'CTBUSRTO1DB1Qv';
+ my Str  $sql-server-instance-name  = $sql-server-name.uc;
+#my Str  $sql-server-instance-name  = 'RTSQL';
+
+ my Str $config-drive               = '%SYSTEMDRIVE%';
+ my Str $baapi-product-directory    = $config-drive ~ '\Program Files\Tivoli\TSM\baclient';
+ my Str $dp4sql-product-directory   = $config-drive ~ '\Program Files\Tivoli\TSM\TDPSql';
+ my Str $config-base-directory      = $config-drive ~ '\WMATA\ITIO\EnterpriseBackup\ISP\NODES';
+ my Int $HTTPPORT                   = 1581 - 2;
+ my Int $WEBPORT                    = 1582 - 2;
 
 unit sub MAIN(
     Str:D :$directory-container-prefix!,                    #= new directory container STGPOOL prefix (I.e. 'DP4SQL', 'BA')
-    Str:D :$tape-devclass                   = 'LTOTAPE',    #= tape DEVCLASS name
+    Str:D :$tape-devclass!,                                 #= tape DEVCLASS name
     :$retention                             = 14,           #= number of days to retain backups
     :$drmdbbackupexpiredays                 = 5,            #= DRMDBBACKUPEXPIREDAYS for REUSEDELAY
     :$node,                                                 #= optional NODE name
@@ -20,18 +37,23 @@ sub define-STGPOOLs () {
     DEFINE STGPOOL  {$directory-container-prefix}_TAPE_1OF2 {$tape-devclass} STGTYPE=DEVCLASS  POOLTYPE=PRIMARY MAXSCRATCH=9999                                                                  DESCRIPTION='{$directory-container-prefix} - PSP on tape + CSP on tape'        RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO              REUSEDELAY={$drmdbbackupexpiredays}
     DEFINE STGPOOL  {$directory-container-prefix}_DISK_1OF1                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                                                                                  DESCRIPTION='{$directory-container-prefix} - PSP on disk only'                 PROTECTSTGPOOL={$directory-container-prefix}_DISK_1OF1 REUSEDELAY={$drmdbbackupexpiredays}
     DEFINE STGPOOL  {$directory-container-prefix}_DISK_1OF2                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                                                                                  DESCRIPTION='{$directory-container-prefix} - PSP on disk only + CSP on tape'   PROTECTSTGPOOL={$directory-container-prefix}_DISK_1OF2 REUSEDELAY={$drmdbbackupexpiredays}
-    DEFINE STGPOOL  {$directory-container-prefix}_DKTP_1OF1                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                 MAXSIZE=200G NEXTSTGPOOL={$directory-container-prefix}_TAPE_1OF1 DESCRIPTION='{$directory-container-prefix} - PSP on disk & tape'               PROTECTSTGPOOL={$directory-container-prefix}_DKTP_1OF1 REUSEDELAY={$drmdbbackupexpiredays}
-    DEFINE STGPOOL  {$directory-container-prefix}_DKTP_1OF2                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                 MAXSIZE=200G NEXTSTGPOOL={$directory-container-prefix}_TAPE_1OF2 DESCRIPTION='{$directory-container-prefix} - PSP on disk & tape + CSP on tape' PROTECTSTGPOOL={$directory-container-prefix}_DKTP_1OF2 REUSEDELAY={$drmdbbackupexpiredays}
+    DEFINE STGPOOL  {$directory-container-prefix}_DKTP_1OF1                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                 MAXSIZE=768G NEXTSTGPOOL={$directory-container-prefix}_TAPE_1OF1 DESCRIPTION='{$directory-container-prefix} - PSP on disk & tape'               PROTECTSTGPOOL={$directory-container-prefix}_DKTP_1OF1 REUSEDELAY={$drmdbbackupexpiredays}
+    DEFINE STGPOOL  {$directory-container-prefix}_DKTP_1OF2                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                 MAXSIZE=768G NEXTSTGPOOL={$directory-container-prefix}_TAPE_1OF2 DESCRIPTION='{$directory-container-prefix} - PSP on disk & tape + CSP on tape' PROTECTSTGPOOL={$directory-container-prefix}_DKTP_1OF2 REUSEDELAY={$drmdbbackupexpiredays}
     ENDOFDEFINESTGPOOLS
     put $output.trans(' ' => ' ', :squash);
 }
 
 sub update-BACKUP-STGPOOL-script () {
     my $output = qq:to/ENDOFUPDATEBACKUPSTGPOOLSCRIPT/;
-    /* BACKUP STGPOOL  {$directory-container-prefix}_TAPE_1OF2 {$directory-container-prefix}_TAPE_2OF2 */
-    DEFINE STGRULE {$directory-container-prefix}_TAPE_2OF2 {$directory-container-prefix}_TAPE_2OF2 ACTIONTYPE=COPY SRCPOOLS={$directory-container-prefix}_DISK_1OF2,{$directory-container-prefix}_DKTP_1OF2
-    /* SET DRMPRIMSTGPOOL <all-current>,{$directory-container-prefix}_TAPE_1OF1,{$directory-container-prefix}_TAPE_1OF2,{$directory-container-prefix}_DISK_1OF1,{$directory-container-prefix}_DISK_1OF2,{$directory-container-prefix}_DKTP_1OF1,{$directory-container-prefix}_DKTP_1OF2 */
-    /* SET DRMCOPYSTGPOOL <all-current>,{$directory-container-prefix}_TAPE_2OF2 */
+    /* BACKUP  STGPOOL  {$directory-container-prefix}_TAPE_1OF2 {$directory-container-prefix}_TAPE_2OF2 */
+    /* DEFINE  STGRULE {$directory-container-prefix}_TAPE_2OF2 {$directory-container-prefix}_TAPE_2OF2 ACTIONTYPE=COPY SRCPOOLS={$directory-container-prefix}_DISK_1OF2,{$directory-container-prefix}_DKTP_1OF2
+    /* SET     DRMPRIMSTGPOOL <all-current>,{$directory-container-prefix}_TAPE_1OF1,{$directory-container-prefix}_TAPE_1OF2,{$directory-container-prefix}_DISK_1OF1,{$directory-container-prefix}_DISK_1OF2,{$directory-container-prefix}_DKTP_1OF1,{$directory-container-prefix}_DKTP_1OF2 */
+    /* SET     DRMCOPYSTGPOOL <all-current>,{$directory-container-prefix}_TAPE_2OF2 */
+    /* PROTECT STGPOOL  {$directory-container-prefix}_DISK_1OF1 WAIT=NO */
+    /* PROTECT STGPOOL  {$directory-container-prefix}_DISK_1OF2 WAIT=NO */
+    /* PROTECT STGPOOL  {$directory-container-prefix}_DKTP_1OF1 WAIT=NO */
+    /* PROTECT STGPOOL  {$directory-container-prefix}_DKTP_1OF2 WAIT=NO */
+    /* PROTECT STGPOOL  {$directory-container-prefix}_TAPE_1OF1 WAIT=NO */
     ENDOFUPDATEBACKUPSTGPOOLSCRIPT
     put $output.trans(' ' => ' ', :squash);
 }
@@ -43,8 +65,8 @@ sub define-policy-stack() {
     DEFINE   DOMAIN       {$directory-container-prefix} ARCHRETENTION=90 BACKRETENTION=90
     DEFINE   POLICYSET    {$directory-container-prefix} STANDARD
     DEFINE   MGMTCLASS    {$directory-container-prefix} STANDARD STANDARD                            MIGDESTINATION=TRAP
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD STANDARD      STANDARD TYPE=ARCHIVE    DESTINATION={$directory-container-prefix}_DKTP_1OF1 RETVER=30
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD STANDARD      STANDARD TYPE=BACKUP     DESTINATION={$directory-container-prefix}_DKTP_1OF1 RETEXTRA=30 RETONLY=30 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD STANDARD      STANDARD TYPE=ARCHIVE    DESTINATION={$directory-container-prefix}_DKTP_1OF1 RETVER=14
+    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD STANDARD      STANDARD TYPE=BACKUP     DESTINATION={$directory-container-prefix}_DKTP_1OF1 RETEXTRA=14 RETONLY=14 VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
     ASSIGN   DEFMGMTCLASS {$directory-container-prefix} STANDARD STANDARD
     ENDOFDEFINEPOLICYSTACK
     $output ~= qq:to/ENDOFDEFINEMGMTCLASS/;
@@ -58,8 +80,8 @@ sub define-policy-stack() {
     DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_TAPE_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_TAPE_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
     DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
     DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DISK_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
-    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DISK_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF1 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DKTP_1OF1 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
+    DEFINE   COPYGROUP    {$directory-container-prefix} STANDARD D{$retention}_DKTP_1OF2 STANDARD TYPE=BACKUP      DESTINATION={$directory-container-prefix}_DKTP_1OF2 RETEXTRA={$retention} RETONLY={$retention} VERDELETED=NOLIMIT VEREXISTS=NOLIMIT
     ENDOFDEFINEMGMTCLASS
     $output ~= qq:to/ENDOFVALIDATEACTIVATE/;
     VALIDATE POLICYSET    {$directory-container-prefix} STANDARD
@@ -73,62 +95,38 @@ sub define-cloptset (Str:D $node) {
     my $sequence-number     = 100;
     my $output = qq:to/ENDOFDEFINECLOPTSETDEFAULTS/;
     DEFINE CLOPTSET  $client-option-set
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\meta\\*'                 D{$retention}_DISK_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\full*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\full*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\diff*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\diff*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\log*'         D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\...\\log*\\...\\*' D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '{$sql-server-instance-name}\\meta\\...\\*'            D{$retention}_DISK_1OF1" SEQ={$sequence-number += 2}
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '{$sql-server-instance-name}\\data\\...\\full*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '{$sql-server-instance-name}\\data\\...\\full*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '{$sql-server-instance-name}\\data\\...\\diff*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '{$sql-server-instance-name}\\data\\...\\diff*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '{$sql-server-instance-name}\\data\\...\\log*'         D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
+    DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '{$sql-server-instance-name}\\data\\...\\log*\\...\\*' D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
     ENDOFDEFINECLOPTSETDEFAULTS
     for @exclude-dbs -> $db-name {
         $output ~= qq:to/ENDOFDEFINECLOPTSETEXCEPTIONS/;
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\full*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\full*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\diff*'        D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\diff*\\*'     D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\log*'         D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
-        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE '\\...\\data\\{$db-name}\\log*\\...\\*' D{$retention}_DKTP_1OF1" SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE             '{$sql-server-instance-name}\\data\\...\\{$db-name}\\full*'         D{$retention}_TAPE_1OF1" SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.DEDUP       '{$sql-server-instance-name}\\data\\...\\{$db-name}\\full*'"                                 SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.COMPRESSION '{$sql-server-instance-name}\\data\\...\\{$db-name}\\full*'"                                 SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE             '{$sql-server-instance-name}\\data\\...\\{$db-name}\\full*\\*'      D{$retention}_TAPE_1OF1" SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.DEDUP       '{$sql-server-instance-name}\\data\\...\\{$db-name}\\full*\\*'"                              SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.COMPRESSION '{$sql-server-instance-name}\\data\\...\\{$db-name}\\full*\\*'"                              SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE             '{$sql-server-instance-name}\\data\\...\\{$db-name}\\diff*'         D{$retention}_TAPE_1OF1" SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.DEDUP       '{$sql-server-instance-name}\\data\\...\\{$db-name}\\diff*'"                                 SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.COMPRESSION '{$sql-server-instance-name}\\data\\...\\{$db-name}\\diff*'"                                 SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE             '{$sql-server-instance-name}\\data\\...\\{$db-name}\\diff*\\*'      D{$retention}_TAPE_1OF1" SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.DEDUP       '{$sql-server-instance-name}\\data\\...\\{$db-name}\\diff*\\*'"                              SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.COMPRESSION '{$sql-server-instance-name}\\data\\...\\{$db-name}\\diff*\\*'"                              SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE             '{$sql-server-instance-name}\\data\\...\\{$db-name}\\log*'          D{$retention}_TAPE_1OF1" SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.DEDUP       '{$sql-server-instance-name}\\data\\...\\{$db-name}\\log*'"                                  SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.COMPRESSION '{$sql-server-instance-name}\\data\\...\\{$db-name}\\log*'"                                  SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "INCLUDE             '{$sql-server-instance-name}\\data\\...\\{$db-name}\\log*\\...\\*'  D{$retention}_TAPE_1OF1" SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.DEDUP       '{$sql-server-instance-name}\\data\\...\\{$db-name}\\log*\\...\\*'"                          SEQ={$sequence-number += 2}
+        DEFINE CLIENTOPT $client-option-set INCLEXCL "EXCLUDE.COMPRESSION '{$sql-server-instance-name}\\data\\...\\{$db-name}\\log*\\...\\*'"                          SEQ={$sequence-number += 2}
         ENDOFDEFINECLOPTSETEXCEPTIONS
     }
     put $output.trans(' ' => ' ', :squash);
 }
-
-define-STGPOOLs;
-update-BACKUP-STGPOOL-script;
-define-policy-stack;
-define-cloptset($node) if $node;
-
-=finish
-
-
-
-DEFINE SCHEDULE
-DEFINE SCHEDULE SQL USSBYSQLD806DTC_FULL ACTION=COMMAND OBJECTS='"C:\Program Files\Tivoli\TSM\TDPSql\SCRIPTS\USSBYSQLD806DTC_FULL_BACKUP.CMD"' STARTTIME=21:00:00
-DEFINE SCHEDULE SQL USSBYSQLD806DTC_LOGS ACTION=COMMAND OBJECTS='"C:\Program Files\Tivoli\TSM\TDPSql\SCRIPTS\USSBYSQLD806DTC_LOGS_BACKUP.CMD"' STARTTIME=00:30:00 PERIOD=4 PERUNITS=HOURS DURATION=30 DURUNITS=MINUTES
-
-
-
-=end pod
-
-#   DEF CLOPTSET, then REG NODE CLO=, then @client-options.push: `INCLEXCL statements controlling the MGMTCLASS`
-
- my Str $isp-server-ip-label        = 'catsmdev01';
- my Str $isp-server-ip-address      = '10.11.101.39';
- my Str $never-fail-host-name       = 'CTBUSRTO1DB1Qv';
-#my Str $client-ip-label            = 'CTBUSRT1DB1MGT'; my Str $client-ip-address = '10.11.138.147';
- my Str $client-ip-label            = 'CTBUSRT1DB2MGT'; my Str $client-ip-address = '10.11.139.145';
-
- my Str  $sql-server-name           = 'CTBUSRTO1DB1Qv';
- my Str  $sql-server-instance-name  = $sql-server-name;
-#my Str  $sql-server-instance-name  = 'RTSQL';
-
- my Str $config-drive               = '%SYSTEMDRIVE%';
- my Str $baapi-product-directory    = $config-drive ~ '\Program Files\Tivoli\TSM\baclient';
- my Str $dp4sql-product-directory   = $config-drive ~ '\Program Files\Tivoli\TSM\TDPSql';
- my Str $config-base-directory      = $config-drive ~ '\WMATA\ITIO\EnterpriseBackup\ISP\NODES';
- my Int $HTTPPORT                   = 1581 - 2;
- my Int $WEBPORT                    = 1582 - 2;
 
 sub pasteable-backup-archive-configuration-file () {
     $HTTPPORT                      += 2;
@@ -221,7 +219,6 @@ sub pasteable-dp4sql-configuration-files () {
     $HTTPPORT                      += 2;
     $WEBPORT                       += 2;
     my Str  $NODENAME               = $sql-server-instance-name.uc ~ '-SQL';
-    my Str  @exclude-dbs            = <CleverCAD CleverCAD_Cadstore>;
     my Str  $EXCLUDEDB              = '/EXCLUDEDB=master,model,msdb';
     $EXCLUDEDB                     ~= ',' ~ @exclude-dbs.join(',') if @exclude-dbs;
     my Str  $node-base-directory    = $config-base-directory ~ '\\' ~ $NODENAME;
@@ -268,10 +265,10 @@ sub pasteable-dp4sql-configuration-files () {
     CD /D \qq[$node-base-directory]
     ECHO  COMMMETHOD                 TCPIP >> \qq[$dsm-opt-file]
     ECHO  COMPRESSALWAYS             YES >> \qq[$dsm-opt-file]
-    ECHO  COMPRESSION                NO >> \qq[$dsm-opt-file]
+    ECHO  COMPRESSION                YES >> \qq[$dsm-opt-file]
     ECHO  DEDUPCACHEPATH             "\qq[$node-base-directory]\DEDUPCACHE"  >> \qq[$dsm-opt-file]
-    ECHO  DEDUPCACHESIZE             2048  >> \qq[$dsm-opt-file]
-    ECHO  DEDUPLICATION              NO  >> \qq[$dsm-opt-file]
+    ECHO  DEDUPCACHESIZE             2048 >> \qq[$dsm-opt-file]
+    ECHO  DEDUPLICATION              YES >> \qq[$dsm-opt-file]
     ECHO  DISKBUFFSIZE               32 >> \qq[$dsm-opt-file]
     ECHO  ENABLEDEDUPCACHE           NO >> \qq[$dsm-opt-file]
     ECHO  ENABLEINSTRUMENTATION      NO >> \qq[$dsm-opt-file]
@@ -405,6 +402,15 @@ sub pasteable-dp4sql-configuration-files () {
     }
 }
 
+#   DEFINE SCHEDULE
+#   DEFINE SCHEDULE SQL USSBYSQLD806DTC_FULL ACTION=COMMAND OBJECTS='"C:\Program Files\Tivoli\TSM\TDPSql\SCRIPTS\USSBYSQLD806DTC_FULL_BACKUP.CMD"' STARTTIME=21:00:00
+#   DEFINE SCHEDULE SQL USSBYSQLD806DTC_LOGS ACTION=COMMAND OBJECTS='"C:\Program Files\Tivoli\TSM\TDPSql\SCRIPTS\USSBYSQLD806DTC_LOGS_BACKUP.CMD"' STARTTIME=00:30:00 PERIOD=4 PERUNITS=HOURS DURATION=30 DURUNITS=MINUTES
+
+
+define-STGPOOLs;
+update-BACKUP-STGPOOL-script;
+define-policy-stack;
+define-cloptset($node) if $node;
 pasteable-backup-archive-configuration-file();
 pasteable-dp4sql-configuration-files();
 
@@ -412,7 +418,7 @@ pasteable-dp4sql-configuration-files();
 
 RTSQL (NeverFail)                                                                                                   [      S]@MMM_FULL_BACKUP
 CleverCAD                   35  Current Size:43GB   Estimated Max Size:85GB     [hourly]@LOGS_BACKUP_CleverCAD.BAT  [SMTWTFS]@FULL_BACKUP_CleverCAD.BAT
-CleverCAD_Cadstore          720 Current Size:5.8 TB Estimated Max Size 8TB                                          [S      ]@FULL_BACKUP_CleverCAD_Cadstore.BAT    [ MTWTFS]@DIFF_BACKUP_CleverCAD_Cadstore.BAT
+CleverCAD_CADStore          720 Current Size:5.8 TB Estimated Max Size 8TB                                          [S      ]@FULL_BACKUP_CleverCAD_CADStore.BAT    [ MTWTFS]@DIFF_BACKUP_CleverCAD_CADStore.BAT
 CleverCAD_ProcessController 35  Current Size:20MB                                                                   [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
 CleverCAD_Staging               Current Size:2GB                                                                    [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
 Schedule                        Current Size:23MB   Estimated Max Size: 25GB                                        [ M     ]@FULL_BACKUP.BAT                       [S TWTFS]@DIFF_BACKUP.BAT
@@ -423,12 +429,12 @@ CW_Adjustments                  Current Size:23MB                               
 Current Backup Cycle:  
                N/A, CleverWorks Databases not currently backed up
                CleverCAD, Transactional Log Backups every hour, Full Backups Daily
-               CleverCAD_Cadstore, Full Backup Weekly, Differentials Daily
-               Other Cad Databases not backed up
+               CleverCAD_CADStore, Full Backup Weekly, Differentials Daily
+               Other CAD Databases not backed up
                
 Recommended Backup Cycle:
                For CleverWorks Databases, Full Backup once a week, Differentials once daily every other day , not run between the hours of 12-4am
-               For CleverCAD and Cadstore databases, maintain a minimum of existing cycle
+               For CleverCAD and CADStore databases, maintain a minimum of existing cycle
                For remaining CAD Databases, follow Cleverworks Schedules
 
 RPSQL (NeverFail)
