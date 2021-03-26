@@ -32,9 +32,9 @@ unit sub MAIN(
 sub define-STGPOOLs () {
     my $output = qq:to/ENDOFDEFINESTGPOOLS/;
     DEFINE STGPOOL  TRAP                                    DISK
-    DEFINE STGPOOL  {$directory-container-prefix}_TAPE_1OF1 {$tape-devclass} STGTYPE=DEVCLASS  POOLTYPE=PRIMARY MAXSCRATCH=9999                                                                  DESCRIPTION='{$directory-container-prefix} - PSP on tape'                      RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO              REUSEDELAY={$drmdbbackupexpiredays}
-    DEFINE STGPOOL  {$directory-container-prefix}_TAPE_2OF2 {$tape-devclass}                   POOLTYPE=COPY    MAXSCRATCH=9999                                                                  DESCRIPTION='{$directory-container-prefix} - CSP on tape'                      RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO              REUSEDELAY={$drmdbbackupexpiredays}
-    DEFINE STGPOOL  {$directory-container-prefix}_TAPE_1OF2 {$tape-devclass} STGTYPE=DEVCLASS  POOLTYPE=PRIMARY MAXSCRATCH=9999                                                                  DESCRIPTION='{$directory-container-prefix} - PSP on tape + CSP on tape'        RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO              REUSEDELAY={$drmdbbackupexpiredays}
+    DEFINE STGPOOL  {$directory-container-prefix}_TAPE_1OF1 {$tape-devclass} STGTYPE=DEVCLASS  POOLTYPE=PRIMARY MAXSCRATCH=9999 RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO                        DESCRIPTION='{$directory-container-prefix} - PSP on tape'                      PROTECTSTGPOOL={$directory-container-prefix}_TAPE_1OF1 REUSEDELAY={$drmdbbackupexpiredays}
+    DEFINE STGPOOL  {$directory-container-prefix}_TAPE_2OF2 {$tape-devclass}                   POOLTYPE=COPY    MAXSCRATCH=9999 RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO                        DESCRIPTION='{$directory-container-prefix} - CSP on tape'                                                                             REUSEDELAY={$drmdbbackupexpiredays}
+    DEFINE STGPOOL  {$directory-container-prefix}_TAPE_1OF2 {$tape-devclass} STGTYPE=DEVCLASS  POOLTYPE=PRIMARY MAXSCRATCH=9999 RECLAIM=100 RECLAIMPROCESS=2 COLLOCATE=NO                        DESCRIPTION='{$directory-container-prefix} - PSP on tape + CSP on tape'        PROTECTSTGPOOL={$directory-container-prefix}_TAPE_1OF2 REUSEDELAY={$drmdbbackupexpiredays}
     DEFINE STGPOOL  {$directory-container-prefix}_DISK_1OF1                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                                                                                  DESCRIPTION='{$directory-container-prefix} - PSP on disk only'                 PROTECTSTGPOOL={$directory-container-prefix}_DISK_1OF1 REUSEDELAY={$drmdbbackupexpiredays}
     DEFINE STGPOOL  {$directory-container-prefix}_DISK_1OF2                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                                                                                  DESCRIPTION='{$directory-container-prefix} - PSP on disk only + CSP on tape'   PROTECTSTGPOOL={$directory-container-prefix}_DISK_1OF2 REUSEDELAY={$drmdbbackupexpiredays}
     DEFINE STGPOOL  {$directory-container-prefix}_DKTP_1OF1                  STGTYPE=DIRECTORY POOLTYPE=PRIMARY                 MAXSIZE=768G NEXTSTGPOOL={$directory-container-prefix}_TAPE_1OF1 DESCRIPTION='{$directory-container-prefix} - PSP on disk & tape'               PROTECTSTGPOOL={$directory-container-prefix}_DKTP_1OF1 REUSEDELAY={$drmdbbackupexpiredays}
@@ -54,6 +54,7 @@ sub update-BACKUP-STGPOOL-script () {
     /* PROTECT STGPOOL  {$directory-container-prefix}_DKTP_1OF1 WAIT=NO */
     /* PROTECT STGPOOL  {$directory-container-prefix}_DKTP_1OF2 WAIT=NO */
     /* PROTECT STGPOOL  {$directory-container-prefix}_TAPE_1OF1 WAIT=NO */
+    /* PROTECT STGPOOL  {$directory-container-prefix}_TAPE_1OF2 WAIT=NO */
     ENDOFUPDATEBACKUPSTGPOOLSCRIPT
     put $output.trans(' ' => ' ', :squash);
 }
